@@ -11,6 +11,8 @@
 #undef AFOUTPUT
 #include "../include/macrooutput.h"
 
+#include "../libafanasy/rapidjson/error/en.h"
+
 WndCustomData::WndCustomData( const QString & i_name, const QString & i_text):
 	Wnd( i_name),
 	m_text( i_text)
@@ -59,7 +61,7 @@ void WndCustomData::checkText()
 
 	if( data == NULL )
 	{
-		msg = "ERROR at " + af::itos( doc.GetErrorOffset()) + ": " + doc.GetParseError();
+		msg = "ERROR at " + af::itos( doc.GetErrorOffset()) + ": " + GetParseError_En(doc.GetParseError());
 		m_qLine->setText( afqt::stoq( msg));
 		printf("%s\n", msg.c_str());
 		return;
