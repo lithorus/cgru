@@ -25,6 +25,7 @@
 
 #include "../include/afanasy.h"
 #include "../include/afjob.h"
+#include "../include/afpynames.h"
 
 #include "common/passwd.h"
 
@@ -61,11 +62,13 @@ int     Environment::task_reconnect_timeout =          AFJOB::TASK_RECONNECT_TIM
 int     Environment::serverport =                      AFADDR::SERVER_PORT;
 
 int     Environment::monitor_zombietime =              AFMONITOR::ZOMBIETIME;
+int     Environment::monitor_render_idle_bar_max =     AFMONITOR::RENDER_IDLE_BAR_MAX;
+int     Environment::monitor_render_cpu_hot_min =      AFMONITOR::RENDER_CPU_HOT_MIN;
+int     Environment::monitor_render_cpu_hot_max =      AFMONITOR::RENDER_CPU_HOT_MAX;
 
 int     Environment::watch_get_events_sec =            AFWATCH::GET_EVENTS_SEC;
 int     Environment::watch_connection_lost_time =      AFWATCH::CONNECTION_LOST_TIME;
 int     Environment::watch_refresh_gui_sec =           AFWATCH::REFRESH_GUI_SEC;
-int     Environment::watch_render_idle_bar_max =       AFWATCH::RENDER_IDLE_BAR_MAX;
 bool    Environment::watch_work_user_visible =         AFWATCH::WORK_USER_VISIBLE;
 
 int     Environment::render_nice =                     AFRENDER::TASKPROCESSNICE;
@@ -88,6 +91,8 @@ std::string Environment::render_networkif =            AFRENDER::NETWORK_IF;
 std::string Environment::render_hddspace_path =        AFRENDER::HDDSPACE_PATH;
 std::string Environment::render_iostat_device =        AFRENDER::IOSTAT_DEVICE;
 bool Environment::render_cut_domain_name =             AFRENDER::CUT_DOMAIN_NAME;
+std::string Environment::render_get_cpu_temperature_mod = AFPYNAMES::RES_MOD_GET_CPU_TEMPERATURE;
+std::string Environment::render_get_hw_info_mod         = AFPYNAMES::RES_MOD_GET_HW_INFO;
 int Environment::render_overflow_mem  = -1;
 int Environment::render_overflow_swap = -1;
 int Environment::render_overflow_hdd  = -1;
@@ -293,6 +298,8 @@ void Environment::getVars( const JSON * i_obj)
 	getVar( i_obj, render_cmd_wolwake,                "af_render_cmd_wolwake"                );
 	getVar( i_obj, render_hddspace_path,              "af_render_hddspace_path"              );
 	getVar( i_obj, render_gpuinfo_nvidia_cmd,         "af_render_gpuinfo_nvidia_cmd"         );
+	getVar( i_obj, render_get_cpu_temperature_mod,    "af_render_get_cpu_temperature_mod"    );
+	getVar( i_obj, render_get_hw_info_mod,            "af_render_get_hw_info_mod"            );
 	getVar( i_obj, render_networkif,                  "af_render_networkif"                  );
 	getVar( i_obj, render_iostat_device,              "af_render_iostat_device"              );
 	getVar( i_obj, render_resclasses,                 "af_render_resclasses"                 );
@@ -310,10 +317,12 @@ void Environment::getVars( const JSON * i_obj)
 	getVar( i_obj, watch_get_events_sec,              "af_watch_get_events_sec"              );
 	getVar( i_obj, watch_refresh_gui_sec,             "af_watch_refresh_gui_sec"             );
 	getVar( i_obj, watch_connection_lost_time,        "af_watch_connection_lost_time"        );
-	getVar( i_obj, watch_render_idle_bar_max,         "af_watch_render_idle_bar_max"         );
 	getVar( i_obj, watch_work_user_visible,           "af_watch_work_user_visible"           );
 
 	getVar( i_obj, monitor_zombietime,                "af_monitor_zombietime"                );
+	getVar( i_obj, monitor_render_idle_bar_max,       "af_monitor_render_idle_bar_max"       );
+	getVar( i_obj, monitor_render_cpu_hot_min,        "af_monitor_render_cpu_hot_min"        );
+	getVar( i_obj, monitor_render_cpu_hot_max,        "af_monitor_render_cpu_hot_max"        );
 
 	getVar( i_obj, errors_forgivetime,                "af_errors_forgivetime"                );
 	getVar( i_obj, errors_avoid_host,                 "af_errors_avoid_host"                 );

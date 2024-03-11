@@ -175,8 +175,16 @@ class AfanasyScheduler(CallbackServerMixin, PyScheduler):
 
     def _constructTask(self, work_item):
         task = af.Task(work_item.name)
-        task.setCommand(self.expandCommandTokens(work_item.command, work_item))
+        cmd = self.expandCommandTokens(work_item.command, work_item)
 
+        if "REZ_USED_RESOLVE" in os.environ:
+                cmd = 'rez-env {} --no-local -- {}'.format(
+                    os.environ["REZ_USED_RESOLVE"],
+                    cmd
+                )
+
+        task.setCommand(cmd)
+        
         # Set environment variables
         task.setEnv('PDG_RESULT_SERVER', str(self.workItemResultServerAddr()))
         task.setEnv('PDG_ITEM_NAME', str(work_item.name))
@@ -470,6 +478,12 @@ class AfanasyScheduler(CallbackServerMixin, PyScheduler):
         # Set top network to cook
         cmd += ' --toppath "%s"' % node_path
 
+        if "REZ_USED_RESOLVE" in os.environ:
+            cmd = 'rez-env {} -- {}'.format(
+                    os.environ["REZ_USED_RESOLVE"],
+                    cmd
+                )
+
         # Constuct a job:
         job = af.Job(self['gj_name'].evaluateString())
         job.setBranch(self['job_branch'].evaluateString())
@@ -491,9 +505,14 @@ class AfanasyScheduler(CallbackServerMixin, PyScheduler):
         # Append task and block and send job
         block.tasks.append(task)
         job.blocks.append(block)
-        job.send()
+        status, struct = job.send()
+        print(status, struct)
+        job_uri = ''
+        job_id = 0
+        if status and struct and 'id' in struct:
+            job_id = struct['id']
 
-        return None
+        return job_uri, job_id
 
 
 # Register Afanasy Scheduler type

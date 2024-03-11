@@ -91,6 +91,9 @@
 "":"Render:",
 	"af_render_gpuinfo_nvidia_cmd":"nvidia-smi --id=0 --query-gpu=utilization.gpu,temperature.gpu,memory.total,memory.used,name --format=csv,noheader,nounits 2>&1",
 
+	"af_render_get_cpu_temperature_mod":"getCPUTemperature",
+	"af_render_get_hw_info_mod":"getHWInfo",
+
 	"-af_render_networkif":"eth0",
 		"":"Network interface to measure traffic",
 		"":"If not specified all used except loopback",
@@ -157,13 +160,14 @@
 "":"Monitor: (server side - any gui)",
 	"af_monitor_zombietime":16,
     "af_monitor_render_idle_bar_max":3600,
+    "af_monitor_render_cpu_hot_min":80,
+    "af_monitor_render_cpu_hot_max":100,
 
 "":"Watch: (qt gui - client side)",
 	"af_watch_get_events_sec":1,
 	"af_watch_refresh_gui_sec":5,
 	"af_watch_connection_lost_time":20,
 		"":"If watch can`t update server for this time, it considers that server connection lost and tries to register again.",
-	"af_watch_render_idle_bar_max":3600,
 	"af_watch_work_user_visible":true,
 
 "":"Database:",

@@ -70,12 +70,14 @@ ListRenders::ListRenders( QWidget* parent):
 	m_ctrl_sf->addSortType(   CtrlSortFilter::TTASKUSER);
 	m_ctrl_sf->addSortType(   CtrlSortFilter::TUSERNAME);
 	m_ctrl_sf->addSortType(   CtrlSortFilter::TENGINE);
+	m_ctrl_sf->addSortType(   CtrlSortFilter::THWINFO);
 	m_ctrl_sf->addSortType(   CtrlSortFilter::TADDRESS);
 	m_ctrl_sf->addFilterType( CtrlSortFilter::TNONE);
 	m_ctrl_sf->addFilterType( CtrlSortFilter::TNAME);
 	m_ctrl_sf->addFilterType( CtrlSortFilter::TUSERNAME);
 	m_ctrl_sf->addFilterType( CtrlSortFilter::TTASKUSER);
 	m_ctrl_sf->addFilterType( CtrlSortFilter::TENGINE);
+	m_ctrl_sf->addFilterType( CtrlSortFilter::THWINFO);
 	m_ctrl_sf->addFilterType( CtrlSortFilter::TADDRESS);
 	initSortFilterCtrl();
 
@@ -188,7 +190,7 @@ ListRenders::ListRenders( QWidget* parent):
 		connect(bp, SIGNAL(sigClicked()), this, SLOT(actDelete()));
 	}
 
-	m_parentWindow->setWindowTitle("Renders");
+	this->setWindowTitleWithPrefix("Renders");
 
 	if (af::Environment::GOD())
 	{
@@ -751,7 +753,7 @@ void ListRenders::calcTitle()
 		}
 	}
 
-	m_parentWindow->setWindowTitle(
+	this->setWindowTitleWithPrefix(
 			QString("Farm: %1 On, %2 Busy, %3 Off, %4 Nimby, %5 Total, %6 Pools")
 			.arg(ronline).arg(rbusy).arg(roffline).arg(rnimby).arg(rtotal).arg(ptotal));
 }

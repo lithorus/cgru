@@ -2,11 +2,16 @@ import cgi
 import json
 import getpass
 import os
+import shutil
 import sys
 import time
 import traceback
 
 import rulib
+
+import cgruutils
+
+import mediainfo
 
 def randMD5():
     hashlib = __import__('hashlib', globals(), locals(), [])
@@ -15,6 +20,9 @@ def randMD5():
 
 def getCurSeconds():
     return round(time.time())
+
+def getCurMSeconds():
+    return round(time.time() * 1000)
 
 def getCurUser():
     return getpass.getuser()
@@ -52,6 +60,20 @@ def getAbsPath(i_path):
         return rulib.ROOT + i_path
     return rulib.ROOT + '/' + i_path
 
+def isAuxFolder(i_path, i_status = None):
+    if i_status is not None:
+        if 'flags' in i_status and 'aux' in i_status['flags']:
+            return True
+
+        if 'progress' in i_status and type(i_status['progress']) is int and i_status['progress'] < 0:
+            return True
+
+    name = os.path.basename(i_path).lower()
+    for aux in rulib.RULES_TOP['aux_folders']:
+        if name.find(aux) == 0:
+            return True
+
+    return False
 
 def getRuFiles(i_path = None, i_ruFolder = None):
     if i_path is None: i_path = os.getcwd()
@@ -160,7 +182,7 @@ def readObj(i_file, o_out = None, i_lock = True):
 
 
 def writeObj(i_file, i_obj, o_out=None):
-    if fileWrite(i_file, json.dumps(i_obj, indent='\t', sort_keys=True), o_out):
+    if fileWrite(i_file, json.dumps(i_obj, indent='\t', sort_keys=False), o_out):
         return True
 
     return False
@@ -195,7 +217,12 @@ def readUser(i_uid, i_full):
     if user is None:
         return None
 
+    # Not full request does not contain news and bookmarks
     if not i_full:
+        return user
+
+    # Auxiliary user state means no news and bookmarks
+    if 'states' in user and 'aux' in user['states']:
         return user
 
     if os.path.isfile(ufile_news):
@@ -288,13 +315,97 @@ def writeUser(i_user, i_full):
     return True
 
 
+def userChangedTasks(i_uid, i_tasks):
+    if i_uid is None:
+        i_uid = getCurUser()
+
+    # Read acctivity from file, or initialize empty
+    activity = dict()
+    activity_file = '%s/users/%s/%s-activity.json' % (rulib.CGRU_LOCATION, i_uid, i_uid)
+    if os.path.isfile(activity_file):
+        activity = readObj(activity_file)
+
+    curtime = getCurSeconds()
+    for path in i_tasks:
+        record = dict()
+        # Get record by path, or create a new:
+        if path in activity:
+            record = activity.pop(path)
+        else:
+            record['ctime'] = curtime
+        record['mtime'] = curtime
+        record['task'] = i_tasks[path]
+
+        # Insert activity as fisrt item (the latest time)
+        activity = {path:record, **activity}
+
+    # Keep maximum number of records:
+    while len(activity) > 1000: #TODO
+        activity.popitem()
+
+    # Write activity file:
+    writeObj(activity_file, activity)
+
+
 def skipFile(i_filename):
     if i_filename in rulib.SKIPFILES:
         return True
     return False
 
 
-def walkDir(admin, i_recv, i_dir, o_out, i_depth):
+def copyTemplate(i_uid, i_template, i_destination, i_names, o_out):
+    if not os.path.isdir(i_template):
+        o_out['error'] = 'Template folder does not exist.'
+        return False
+    if not os.path.isdir(i_destination):
+        o_out['error'] = 'Destination folder does not exist.'
+        return False
+    if not type(i_names) is list:
+        o_out['error'] = 'New names parameter should be list.'
+        return False
+    if len(i_names) == 0:
+        o_out['error'] = 'New names parameter is an empty list.'
+        return False
+    if i_uid is None:
+        i_uid = getCurUser()
+
+    obj = dict()
+    obj['cuser'] = i_uid
+    obj['ctime'] = getCurSeconds()
+
+    o_out['copies'] = []
+    for name in i_names:
+        copy = dict()
+
+        dest = os.path.normpath(os.path.join(i_destination, name))
+        copy['dest'] = dest
+        if os.path.isdir(dest):
+            copy['exist'] = True
+        else:
+            try:
+               shutil.copytree(i_template, dest)
+            except PermissionError:
+                copy['error'] = 'Permission denied: %s' % dest
+                continue
+            except:
+                copy['error'] = '%s' % traceback.format_exc()
+                continue
+
+            try:
+                cfile = os.path.join(dest, rulib.RUFOLDER, 'location.json')
+                cfileDir = os.path.dirname(cfile)
+                if not os.path.isdir(cfileDir):
+                    os.mkdir(cfileDir)
+                writeObj(cfile, obj)
+            except:
+                copy['error'] = 'Unable to write rules file.'
+                copy['info'] = '%s' % traceback.format_exc()
+
+        o_out['copies'].append(copy)
+
+    return True
+
+def walkDir(i_admin, i_recv, i_dir, o_out, i_depth):
     if i_depth > i_recv['depth']:
         return
 
@@ -314,7 +425,7 @@ def walkDir(admin, i_recv, i_dir, o_out, i_depth):
 
     access = False
     denied = True
-    if admin.htaccessPath(i_dir):
+    if i_admin is None or i_admin.htaccessPath(i_dir):
         access = True
         denied = False
     else:
@@ -344,10 +455,19 @@ def walkDir(admin, i_recv, i_dir, o_out, i_depth):
                 if walk and 'files' in walk and entry in walk['files']:
                     file_info = walk['files'][entry]
                 file_info['name'] = os.fsencode(entry).decode('utf-8', 'surrogateescape')
+
                 st = os.stat(path)
                 file_info['size'] = st.st_size
                 file_info['mtime'] = st.st_mtime
                 file_info['space'] = st.st_blocks * 512
+
+                if 'mediainfo' in i_recv and i_recv['mediainfo']:
+                    if cgruutils.isMovieExt(entry):
+                        obj = mediainfo.processMovie(path)
+                        if obj and 'mediainfo' in obj:
+                            for k in obj['mediainfo']:
+                                file_info[k] = obj['mediainfo'][k]
+
                 o_out['files'].append(file_info)
             continue
 
@@ -409,7 +529,7 @@ def walkDir(admin, i_recv, i_dir, o_out, i_depth):
         if denied:
             continue
 
-        if admin.htaccessFolder(path) is False:
+        if i_admin is not None and i_admin.htaccessFolder(path) is False:
             continue
 
         folderObj = dict()
@@ -429,7 +549,7 @@ def walkDir(admin, i_recv, i_dir, o_out, i_depth):
                 folderObj['thumbnail'] = True
 
         if i_depth < i_recv['depth']:
-            walkDir(admin, i_recv, path, folderObj, i_depth + 1)
+            walkDir(i_admin, i_recv, path, folderObj, i_depth + 1)
 
         o_out['folders'].append(folderObj)
 

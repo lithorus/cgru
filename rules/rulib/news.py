@@ -325,6 +325,16 @@ def isUserAssignedInStatus(i_user, i_obj):
             # If it is a news on change something, but not status (body, comments),
             # All tasks users should receive news (if task is not done)
             if 'title' in i_obj and i_obj['title'] != 'status':
+                if 'tags' in i_obj:
+                    # If news has tags, we should send it only to users with task contains news tag.
+                    # Comments and reports can have tags.
+                    found = False
+                    for tag in i_obj['tags']:
+                        if tag in task['tags']:
+                            found = True
+                            break
+                    if not found:
+                        continue
                 return True
 
     return False
@@ -398,6 +408,8 @@ def checkIntersection(obj_a, key_a, no_a, obj_b, key_b, no_b):
 
 # Remove not needed status fields:
 def filterStatus(i_sdata):
+    if i_sdata is None:
+        return None
     sdata = dict()
     skip_keys = ['body']
     for key in i_sdata:
@@ -414,10 +426,26 @@ def statusesChanged(i_statuses, out=dict(), nonews=False):
         makeNewsAndBookmarks({'news':news}, i_statuses[0].data['muser'], out=out, nonews=nonews)
 
 
-def createNews(title='news',uid=None,path=None,status=None):
+def commentsChanged(i_path_cdata, uid=None, out=dict(), nonews=False):
+    news = []
+    title = 'comment'
+    for path in i_path_cdata:
+        cdata = i_path_cdata[path]
+        sdata = rulib.status.getStatusData(path)
+        if 'type' in cdata and cdata['type'] == 'report':
+            title = 'report'
+        tags = None
+        if 'tags' in cdata and len(cdata['tags']):
+            tags = cdata['tags']
+        news.append(createNews(title=title, path=path, uid=uid, status=sdata, tags=tags))
+    if len(news):
+        makeNewsAndBookmarks({'news':news}, uid, out=out, nonews=nonews)
+
+
+def createNews(title='news', uid=None, path=None, status=None, tags=None):
     if uid is None: uid = rulib.functions.getCurUser()
     if path is None: path = os.getcwd()
-    if status is None: rulib.status.getStatusData()
+    if status is None: rulib.status.getStatusData(path)
 
     news = dict()
     news['title'] = title
@@ -426,5 +454,7 @@ def createNews(title='news',uid=None,path=None,status=None):
     news['status'] = filterStatus(status)
     news['time'] = rulib.functions.getCurSeconds()
     news['id'] = news['user'] + '_' + str(news['time']) + '_' + news['path']
+    if tags is not None:
+        news['tags'] = tags
 
     return news

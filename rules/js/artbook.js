@@ -421,18 +421,204 @@ function ArtPage(i_el, i_artist)
 	this.elInfo.classList.add('info');
 	this.elInfo.innerHTML = info;
 
-	// Bookmarks:
-	this.elBmrks = document.createElement('div');
-	this.elRoot.appendChild(this.elBmrks);
-	this.elBmrks.classList.add('ap_bmrks_div');
+	// Body:
+	this.elBody = document.createElement('div');
+	this.elRoot.appendChild(this.elBody);
 
 	// Show bookmarks per project:
 	for (let project of this.artist.projects)
 	{
-		let prj = new ArtPagePrj(this.elBmrks, project, this.artist);
+		let prj = new ArtPagePrj(this.elBody, project, this.artist);
 		ab_art_projects.push(prj);
 	}
+
+	if (this.artist.projects.length == 0)
+		return;
+
+	// Activity:
+	this.elActRoot = document.createElement('div');
+	this.elBody.appendChild(this.elActRoot);
+	this.elActRoot.classList.add('artpage_actroot');
+
+	let elActPanel = document.createElement('div');
+	this.elActRoot.appendChild(elActPanel);
+	elActPanel.classList.add('panel');
+
+	this.elBtnActLoad = document.createElement('div');
+	elActPanel.appendChild(this.elBtnActLoad);
+	this.elBtnActLoad.classList.add('button');
+	this.elBtnActLoad.textContent = 'Load Activity';
+	this.elBtnActLoad.m_this = this;
+	this.elBtnActLoad.onclick = function(e){e.currentTarget.m_this.activityLoad();}
+
+	this.elBtnActClose = document.createElement('div');
+	elActPanel.appendChild(this.elBtnActClose);
+	this.elBtnActClose.classList.add('button','close');
+	this.elBtnActClose.textContent = 'Close Activity';
+	this.elBtnActClose.m_this = this;
+	this.elBtnActClose.onclick = function(e){e.currentTarget.m_this.activityClose();}
+	this.elBtnActClose.style.display = 'none';
+
+	this.elActivityInfo = document.createElement('div');
+	elActPanel.appendChild(this.elActivityInfo);
+	this.elActivityInfo.classList.add('info');
+
+	this.elActivity = document.createElement('div');
+	this.elActRoot.appendChild(this.elActivity);
+	this.elActivity.classList.add('artpage_activity');
 }
+
+ArtPage.prototype.activityClose = function()
+{
+	this.elBtnActLoad.style.display = 'block';
+	this.elBtnActClose.style.display = 'none';
+	this.elActivityInfo.textContent = '';
+	this.elActivity.textContent = '';
+}
+
+function ad_GetUserActivityFileName(i_id){return ad_GetUserFileName(i_id, 'activity');}
+ArtPage.prototype.activityLoad = function()
+{
+	n_GetFile({
+		'path': ad_GetUserActivityFileName(this.artist.id),
+		'func': ad_UserActivityReceived,
+		'object': this,
+		'info': 'activity',
+		'cache_time': -1,
+		'parse': true,
+		'local': false
+	});
+}
+function ad_UserActivityReceived(i_data, i_args)
+{
+	i_args.object.activityReceived(i_data);
+}
+ArtPage.prototype.activityReceived = function(i_data)
+{
+	if ((i_data == null) || (i_data.error))
+	{
+		this.elActRoot.textContent = 'No activity found.';
+		c_Log(JSON.stringify(i_data));
+		return;
+	}
+
+	this.elBtnActLoad.style.display = 'none';
+	this.elBtnActClose.style.display = 'block';
+	this.elActivity.textContent = '';
+
+	let stat = {};
+	stat.count = 0;
+	stat.time_min = 0;
+	stat.time_max = 0;
+	stat.flags = {};
+
+	for (let path in i_data)
+	{
+		let act = i_data[path];
+
+		let elAct = document.createElement('div');
+		this.elActivity.appendChild(elAct);
+		elAct.classList.add('artpage_act');
+
+		let elPath = document.createElement('a');
+		elAct.appendChild(elPath);
+		elPath.classList.add('path');
+		elPath.textContent = path;
+		elPath.href = '#' + path;
+		elPath.target = '_blank';
+
+		if (act.task.cuser)
+		{
+			let elCUser = st_CreateElArtist(act.task.cuser, true);
+			elAct.appendChild(elCUser);
+			elCUser.classList.add('user','cuser');
+			let tip = 'Created by ' + c_GetUserTitle(act.task.cuser);
+			if (act.task.ctime)
+				tip += '\n' + c_DT_StrFromSec(act.task.ctime);
+			elCUser.title = tip;
+		}
+
+		let elTask = document.createElement('div');
+		elAct.appendChild(elTask);
+		elTask.classList.add('task');
+
+		task_DrawBadges({'tasks':[act.task]}, elTask, {'full_names':true});
+
+		if (act.task.muser)
+		{
+			let elMUser = st_CreateElArtist(act.task.muser, true);
+			elAct.appendChild(elMUser);
+			elMUser.classList.add('user','muser');
+			let tip = 'Modified by ' + c_GetUserTitle(act.task.muser);
+			if (act.task.mtime)
+				tip += '\n' + c_DT_StrFromSec(act.task.mtime);
+			elMUser.title = tip;
+		}
+
+		let elTime = document.createElement('div');
+		elAct.appendChild(elTime);
+		elTime.classList.add('time');
+		let time = '';
+		if (act.ctime)
+			time = c_DT_StrFromSec(act.ctime);
+		time += ' - ';
+		if (act.mtime)
+			time += c_DT_StrFromSec(act.mtime);
+		elTime.textContent = time;
+
+		// Collect stat:
+		stat.count += 1;
+		if (act.mtime)
+		{
+			if (stat.count == 1)
+			{
+				stat.time_min = act.mtime;
+				stat.time_max = act.mtime;
+			}
+			else
+			{
+				if (stat.time_min > act.mtime)
+					stat.time_min = act.mtime;
+				if (stat.time_max < act.mtime)
+					stat.time_max = act.mtime;
+			}
+		}
+		if (act.task.flags)
+		{
+			for (let flag of act.task.flags)
+			{
+				if (flag in stat.flags)
+					stat.flags[flag] += 1;
+				else
+					stat.flags[flag] = 1;
+			}
+		}
+	}
+
+
+	let elCount = document.createElement('div');
+	this.elActivityInfo.appendChild(elCount);
+	elCount.textContent = 'Count = ' + stat.count;
+
+	let elTime = document.createElement('div');
+	this.elActivityInfo.appendChild(elTime);
+	elTime.textContent = c_DT_StrFromSec(stat.time_min) + ' - ' + c_DT_StrFromSec(stat.time_max);
+
+	for (let flag in stat.flags)
+	{
+		let elFlag = document.createElement('div');
+		this.elActivityInfo.appendChild(elFlag);
+		elFlag.classList.add('tag','flag');
+		elFlag.textContent = c_GetFlagTitle(flag) + ' x ' + stat.flags[flag];
+		elFlag.title = c_GetFlagTip(flag);
+		let clr = null;
+		if (RULES.flags[flag] && RULES.flags[flag].clr)
+			clr = RULES.flags[flag].clr;
+		if (clr)
+			st_SetElColor({"color": clr}, elFlag);
+	}
+}
+
 
 function ArtPagePrj(i_el, i_project, i_artist)
 {
@@ -444,15 +630,134 @@ function ArtPagePrj(i_el, i_project, i_artist)
 	this.elParent.appendChild(this.elRoot);
 	this.elRoot.classList.add('artpage_prj')
 
+	this.elPanel = document.createElement('div');
+	this.elRoot.appendChild(this.elPanel);
+	this.elPanel.classList.add('panel');
+
+	this.elBtnExpand = document.createElement('div');
+	this.elPanel.appendChild(this.elBtnExpand);
+	this.elBtnExpand.classList.add('button');
+	this.elBtnExpand.textContent = 'Expand';
+	this.elBtnExpand.m_this = this;
+	this.elBtnExpand.onclick = function(e){e.currentTarget.m_this.expand();}
+
+	this.elBtnCollapse = document.createElement('div');
+	this.elPanel.appendChild(this.elBtnCollapse);
+	this.elBtnCollapse.classList.add('button');
+	this.elBtnCollapse.textContent = 'Collapse';
+	this.elBtnCollapse.m_this = this;
+	this.elBtnCollapse.onclick = function(e){e.currentTarget.m_this.collapse();}
+	this.elBtnCollapse.style.display = 'none';
+
 	this.elTitle = document.createElement('div');
-	this.elRoot.appendChild(this.elTitle);
+	this.elPanel.appendChild(this.elTitle);
 	this.elTitle.textContent = this.project.name;
 	this.elTitle.classList.add('title');
 
-	this.elBmrks = document.createElement('div');
-	this.elRoot.appendChild(this.elBmrks);
-	this.elBmrks.classList.add('ap_bmrks_div');
+	this.elStat = document.createElement('div');
+	this.elRoot.appendChild(this.elStat);
+	this.elStat.classList.add('prj_stat');
 
+	this.showStat();
+}
+
+ArtPagePrj.prototype.showStat = function()
+{
+	let prj_bms = [];
+	for (let scene of this.project.scenes)
+		prj_bms = prj_bms.concat(scene.bms);
+
+	prj_bms.sort(ab_CompareBookmarks(this.artist.id));
+
+	let acts = {};
+
+	for (let bm of prj_bms)
+	{
+		if (bm.status == null) continue;
+		if (bm.status.tasks == null) continue;
+		for (let name in bm.status.tasks)
+		{
+			let t = bm.status.tasks[name];
+			if (t.deleted) continue;
+			if (t.artists == null) continue;
+			if (t.artists.indexOf(this.artist.id) == -1) continue;
+
+			let act = {};
+			if (name in acts)
+				act = acts[name]
+			else
+			{
+				act.count = 0;
+				act.flags = {};
+			}
+
+			act.count += 1;
+
+			if (t.flags )
+				for (let f of t.flags)
+					if (f in act.flags)
+						act.flags[f] += 1;
+					else
+						act.flags[f] = 1;
+
+			acts[name] = act;
+		}
+	}
+
+	for (let act in acts)
+	{
+		let elAct = document.createElement('div');
+		this.elStat.appendChild(elAct);
+		elAct.classList.add('prj_act');
+
+		let elName = document.createElement('div');
+		elAct.appendChild(elName);
+		elName.classList.add('name');
+		elName.innerHTML = '<b>' + act + '</b> x ' + acts[act].count;
+
+		if ('flags' in acts[act])
+			for (let flag in acts[act].flags)
+			{
+				let elFlag = document.createElement('div');
+				elAct.appendChild(elFlag);
+				elFlag.classList.add('tag','flag');
+				elFlag.textContent = c_GetFlagTitle(flag) + ' x ' + acts[act].flags[flag];
+				elFlag.title = c_GetFlagTip(flag);
+				let clr = null;
+				if (RULES.flags[flag] && RULES.flags[flag].clr)
+					clr = RULES.flags[flag].clr;
+				if (clr)
+					st_SetElColor({"color": clr}, elFlag);
+			}
+	}
+}
+
+ArtPagePrj.prototype.expand = function()
+{
+	this.elBtnExpand.style.display = 'none';
+	this.elBtnCollapse.style.display = 'block';
+
+	if (this.elBmrks)
+	{
+		this.elBmrks.style.display = 'block';
+	}
+	else
+	{
+		this.elBmrks = document.createElement('div');
+		this.elRoot.appendChild(this.elBmrks);
+		this.showFull();
+	}
+}
+
+ArtPagePrj.prototype.collapse = function()
+{
+	this.elBtnCollapse.style.display = 'none';
+	this.elBtnExpand.style.display = 'block';
+	this.elBmrks.style.display = 'none';
+}
+
+ArtPagePrj.prototype.showFull = function()
+{
 	// Collect bookmarks of all project scenes:
 	let prj_bms = [];
 	for (let scene of this.project.scenes)

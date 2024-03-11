@@ -22,6 +22,7 @@
 #include <QBoxLayout>
 #include <QInputDialog>
 #include <QMenu>
+#include <QMessageBox>
 #include <QSplitter>
 
 #define AFOUTPUT
@@ -227,7 +228,7 @@ ListJobs::ListJobs(QWidget * i_parent, bool i_listwork, const std::string & i_na
 	timer->start( 1000 * af::Environment::getWatchRefreshGuiSec());
 	connect( timer, SIGNAL( timeout()), this, SLOT( repaintItems()));
 
-	m_parentWindow->setWindowTitle("Jobs:");
+	this->setWindowTitleWithPrefix("Jobs:");
 }
 
 ListJobs::~ListJobs()
@@ -671,7 +672,7 @@ void ListJobs::calcTotals()
 
 	if (numjobs == 0)
 	{
-		m_parentWindow->setWindowTitle("Jobs: (none)");
+		this->setWindowTitleWithPrefix("Jobs: (none)");
 		return;
 	}
 
@@ -702,10 +703,10 @@ void ListJobs::calcTotals()
 		title += QString(" Run:%1 %2%").arg(running).arg(percent / blocksrun);
 		if (done)
 			title += QString(" Done:%1").arg(done);
-		m_parentWindow->setWindowTitle(title);
+		this->setWindowTitleWithPrefix(title);
 	}
 	else
-		m_parentWindow->setWindowTitle(QString("Jobs: %1 Done").arg(numjobs));
+		this->setWindowTitleWithPrefix(QString("Jobs: %1 Done").arg(numjobs));
 }
 
 void ListJobs::actMoveUp()     { moveJobs("move_jobs_up"    ); }
@@ -758,7 +759,13 @@ void ListJobs::actDeleteDone()
 
 	if( ids.size() == 0 )
 	{
-		displayWarning("No done jobs founded.");
+		displayWarning("No done jobs found.");
+		return;
+	}
+
+	if (QMessageBox::question(this, "Delete Done Jobs", QString("Delete %1 done jobs?").arg(ids.size()),
+				QMessageBox::No | QMessageBox::Yes, QMessageBox::No) == QMessageBox::No)
+	{
 		return;
 	}
 

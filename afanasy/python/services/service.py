@@ -26,6 +26,7 @@ class service(object):  # TODO: Class names should follow CamelCase naming conve
     def __init__(self, taskInfo, i_verbose):
         self.taskInfo = taskInfo
         self.verbose = i_verbose
+        self.skip_task = False
         self.log = None
 
         self.numeric = afcommon.checkBlockFlag(
@@ -49,8 +50,8 @@ class service(object):  # TODO: Class names should follow CamelCase naming conve
         # Transfer command:
         command = self.pm.toClient(command)
 
-        # Apply capacity:
-        if self.taskInfo['capacity'] > 0:
+        # Apply capacity_coeff:
+        if 'capacity_coeff' in self.taskInfo and self.taskInfo['capacity_coeff'] > 0:
             command = self.applyCmdCapacity(command)
 
         # Apply hosts (multihosts tasks):
@@ -166,16 +167,16 @@ class service(object):  # TODO: Class names should follow CamelCase naming conve
                 continue
 
             # Check files size:
-            file_size_min = self.taskInfo['file_size_min']
-            file_size_max = self.taskInfo['file_size_max']
+            file_size_min = self.taskInfo.get('file_size_min', 0)
+            file_size_max = self.taskInfo.get('file_size_max', 0)
             if file_size_min > 0 or file_size_max > 0:
                 size = os.path.getsize(afile)
                 if file_size_min > 0 and size < file_size_min:
                     allFilesExist = False
-                    log += 'File size less than minimum(%d): "%s"\n' % (file_size_min, afile)
+                    log += 'Existing file size less than minimum(%d < %d): "%s"\n' % (size, file_size_min, afile)
                     continue
                 if file_size_max > 0 and size > file_size_max:
-                    log += 'File size greater than maximum(%d): "%s"\n' % (file_size_max, afile)
+                    log += 'Existing file size greater than maximum(%d > %d): "%s"\n' % (size, file_size_max, afile)
                     allFilesExist = False
                     continue
 
@@ -183,13 +184,16 @@ class service(object):  # TODO: Class names should follow CamelCase naming conve
 
         if allFilesExist:
             log += 'Task file(s) exists. Skipping command execution.\n'
-            self.taskInfo['command'] = ''
+            self.skip_task = True
 
         if len(log):
             if self.log is not None and len(self.log):
                 self.log += log
             else:
                 self.log = log
+
+    def skipTask(self):
+        return self.skip_task
 
     def getWDir(self):
         """Missing DocString
@@ -260,11 +264,12 @@ class service(object):  # TODO: Class names should follow CamelCase naming conve
 
         :return:
         """
-        command = command.replace(
-            self.str_capacity,
-            str(self.taskInfo['capacity'])
-        )
-        print('Capacity coefficient %s applied:' % self.taskInfo['capacity'])
+        capacity_coeff = self.taskInfo.get('capacity_coeff')
+        if capacity_coeff is None:
+            capacity_coeff = 1
+            print('ERROR: Capacity coefficient is not set, using 1')
+        command = command.replace(self.str_capacity, str(capacity_coeff))
+        print('Capacity coefficient %d applied:' % capacity_coeff)
         print(command)
         return command
 
@@ -423,8 +428,8 @@ class service(object):  # TODO: Class names should follow CamelCase naming conve
         :return:
         """
 
-        file_size_min = self.taskInfo['file_size_min']
-        file_size_max = self.taskInfo['file_size_max']
+        file_size_min = self.taskInfo.get('file_size_min', 0)
+        file_size_max = self.taskInfo.get('file_size_max', 0)
 
         for i in range(0, len(self.taskInfo['files'])):
             afile = self.taskInfo['files'][i]
@@ -439,11 +444,11 @@ class service(object):  # TODO: Class names should follow CamelCase naming conve
                 size = os.path.getsize(afile)
 
                 if file_size_min > 0 and size < file_size_min:
-                    self.log = 'File size less than minimum (%d < %d):\n%s' % (size, file_size_min, afile)
+                    self.log = 'Rendered file size less than minimum (%d < %d):\n%s' % (size, file_size_min, afile)
                     return False
 
                 if file_size_max > 0 and size > file_size_max:
-                    self.log = 'File size greater than maximum (%d < %d):\n%s' % (size, file_size_max, afile)
+                    self.log = 'Rendered file size greater than maximum (%d > %d):\n%s' % (size, file_size_max, afile)
                     return False
 
         return True

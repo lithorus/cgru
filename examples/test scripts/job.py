@@ -83,6 +83,7 @@ parser.add_argument('-x', '--xcopy',        dest='xcopy',        type=int,   def
 parser.add_argument(      '--ppa',          dest='ppapproval',   action='store_true', default=False, help='Preview pending approval')
 parser.add_argument(      '--nofolder',     dest='nofolder',     action='store_true', default=False, help='do not set any folders')
 parser.add_argument(      '--sub',          dest='subdep',       action='store_true', default=False, help='sub task dependence')
+parser.add_argument(      '--depblock',     dest='depblock',     action='store_true', default=False, help='Blocks will be depend by block depend mask. If not set, blocks will bepend by tasks.')
 parser.add_argument('-s', '--stringtype',   dest='stringtype',   action='store_true', default=False, help='generate not numeric blocks')
 parser.add_argument('-o', '--output',       dest='output',       action='store_true', default=False, help='output job information')
 parser.add_argument(      '--pause',        dest='pause',        action='store_true', default=False, help='start job paused')
@@ -175,9 +176,12 @@ for b in range(numblocks):
         block.setParser(Args.parser)
 
     if b > 0:
-        job.blocks[b - 1].setTasksDependMask(blockname)
-        if Args.subdep:
-            job.blocks[b].setDependSubTask()
+        if Args.depblock:
+            job.blocks[b - 1].setDependMask(blockname)
+        else:
+            job.blocks[b - 1].setTasksDependMask(blockname)
+            if Args.subdep:
+                job.blocks[b].setDependSubTask()
 
     if Args.maxtime:
         block.setTasksMaxRunTime(Args.maxtime)
@@ -211,7 +215,8 @@ for b in range(numblocks):
                 'Warning: Invalid tickets: "%s"' % Args.environment
 
     if Args.filemin != -1 or Args.filemax != -1:
-        block.setFileSizeCheck(Args.filemin, Args.filemax)
+        block.skipExistingFiles(Args.filemin, Args.filemax)
+        block.checkRenderedFiles(Args.filemin, Args.filemax)
 
     negative_pertask = False
     if Args.frames != '':
@@ -239,9 +244,12 @@ for b in range(numblocks):
 
     if Args.filesout:
         cmd += ' --filesout "%s"' % Args.filesout
-        block.checkRenderedFiles(100)
+        filemin = 100
+        if Args.filemin > 0:
+            filemin = Args.filemin
+        block.checkRenderedFiles(filemin, Args.filemax)
         if Args.skipexist:
-            block.skipExistingFiles()
+            block.skipExistingFiles(filemin, Args.filemax)
         files = []
         for afile in Args.filesout.split(';'):
             files.append(afcommon.patternFromStdC(afile))

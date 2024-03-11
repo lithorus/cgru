@@ -122,12 +122,14 @@ public:
 	static inline const std::vector<std::string> & getRenderLaunchCmds()     { return render_launch_cmds; }
 	static inline const std::vector<std::string> & getRenderLaunchCmdsExit() { return render_launch_cmds_exit; }
 
-	static inline int getMonitorZombieTime()             { return monitor_zombietime;           }
+	static inline int getMonitorZombieTime()       {return monitor_zombietime;         }
+	static inline int getMonitorRenderIdleBarMax() {return monitor_render_idle_bar_max;}
+	static inline int getMonitorRenderCPUHotMin()  {return monitor_render_cpu_hot_min; }
+	static inline int getMonitorRenderCPUHotMax()  {return monitor_render_cpu_hot_max; }
 
 	static inline int  getWatchGetEventsSec()       { return watch_get_events_sec;      }
 	static inline int  getWatchRefreshGuiSec()      { return watch_refresh_gui_sec;     }
 	static inline int  getWatchConnectionLostTime() { return watch_connection_lost_time;}
-	static inline int  getWatchRenderIdleBarMax()   { return watch_render_idle_bar_max; }
 	static inline bool getWatchWorkUserVisible()    { return watch_work_user_visible;   }
 
 	static inline const char * getTimeFormat()         { return timeformat.c_str();       } ///< Get default time format.
@@ -173,11 +175,13 @@ public:
 	static inline const std::string & getRenderCmdShutdown()   { return render_cmd_shutdown;    }
 	static inline const std::string & getRenderCmdWolSleep()   { return render_cmd_wolsleep;    }
 	static inline const std::string & getRenderCmdWolWake()    { return render_cmd_wolwake;     }
-	static inline const std::string & getRenderGPUInfoNvidiaCmd(){return render_gpuinfo_nvidia_cmd;}
 	static inline const std::string & getRenderNetworkIF()     { return render_networkif;       }
 	static inline const std::string & getRenderHDDSpacePath()  { return render_hddspace_path;   }
 	static inline const std::string & getRenderIOStatDevice()  { return render_iostat_device;   }
-	static inline const std::vector<std::string> & getRenderResClasses() { return render_resclasses;}
+	static inline const std::vector<std::string> & getRenderResClasses() { return render_resclasses;     }
+	static inline const std::string & getRenderGPUInfoNvidiaCmd() {return render_gpuinfo_nvidia_cmd;     }
+	static inline const std::string & getRenderCPUTemperatureMod(){return render_get_cpu_temperature_mod;}
+	static inline const std::string & getRenderHWInfoMod()        {return render_get_hw_info_mod;        }
 
 	static inline int getRenderOverflowMem()  {return render_overflow_mem; }
 	static inline int getRenderOverflowSwap() {return render_overflow_swap;}
@@ -321,10 +325,12 @@ private:
 	static int  watch_get_events_sec;
 	static int  watch_refresh_gui_sec;
 	static int  watch_connection_lost_time;
-	static int  watch_render_idle_bar_max;
 	static bool watch_work_user_visible;
 
 	static int monitor_zombietime;
+	static int monitor_render_idle_bar_max;
+	static int monitor_render_cpu_hot_min;
+	static int monitor_render_cpu_hot_max;
 
 	static std::string timeformat;    ///< Default time format.
 
@@ -347,6 +353,8 @@ private:
 	static std::string render_iostat_device;
 	static std::vector<std::string> render_resclasses;
 	static std::string render_gpuinfo_nvidia_cmd;
+	static std::string render_get_cpu_temperature_mod;
+	static std::string render_get_hw_info_mod;
 	static std::string render_networkif;
 
 	static bool render_cut_domain_name;

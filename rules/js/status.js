@@ -156,6 +156,10 @@ function Status(i_obj, i_args)
 	if (i_args == null)
 		i_args = {};
 
+	this.multi = false;
+	if (i_args.multi)
+		this.multi = true;
+
 	if (i_args.createGUI)
 		i_args.createGUI(this);
 	else
@@ -175,6 +179,9 @@ function Status(i_obj, i_args)
 		this.elFramesNum = $('status_framesnum');
 		this.elFinish = $('status_finish');
 		this.elModified = $('status_modified');
+
+		this.elTasks = $('status_tasks');
+
 		this.elReportsDiv = $('status_reports_div');
 		this.elReports = $('status_reports');
 	}
@@ -200,7 +207,8 @@ function Status(i_obj, i_args)
 	this.show();
 }
 
-Status.prototype.show = function(i_status, i_update = false) {
+Status.prototype.show = function(i_status, i_update = false)
+{
 	if (i_status)
 	{
 		if (i_update && this.obj)
@@ -265,12 +273,48 @@ Status.prototype.show = function(i_status, i_update = false) {
 		}
 	}
 
-	if (this.args.tasks_badges)
-		task_DrawBadges(this.obj, this.elTasks/*, {'only_my':this.args.display_short}*/);
-	else
-		task_ShowTasks(this);
+	// Global status will be cleaned in tasks_Finish() function.
+	// So here we should clean multi statuses (scene shots view).
+	if (this.multi)
+	{
+		if (this.tasks)
+			for (let t in this.tasks)
+				this.tasks[t].destroy();
 
-	var args = {};
+		if (this.elTasks)
+			this.elTasks.textContent = '';
+	}
+
+	if (this.args.tasks_badges)
+	{
+		let elBages = task_DrawBadges(this.obj, this.elTasksBadges/*, {'only_my':this.args.display_short}*/);
+		if (this.multi)
+		{
+			if (elBages && elBages.length)
+			{
+				for (let el of elBages)
+				{
+					el.m_status = this;
+					el.onclick = function(e){
+						e.stopPropagation();
+						e.currentTarget.m_status.elTasksBadges.style.display = 'none';
+						e.currentTarget.m_status.args.tasks_badges = false;
+						e.currentTarget.m_status.showTasks();
+					};
+				}
+			}
+			else
+			{
+				this.createAddTaskButton();
+			}
+		}
+	}
+	else
+	{
+		this.showTasks();
+	}
+
+	let args = {};
 	args.statuses = [this.obj];
 	args.elReports = this.elReports;
 	args.elReportsDiv = this.elReportsDiv;
@@ -281,6 +325,41 @@ Status.prototype.show = function(i_status, i_update = false) {
 	this.elParent.classList.remove('fading');
 	this.elParent.classList.remove('updating');
 };
+
+Status.prototype.showTasks = function()
+{
+	tasks_Finish();
+
+	if (this.obj && this.obj.tasks)
+	{
+		for (let t in this.obj.tasks)
+		{
+			let task = new Task(this, this.obj.tasks[t]);
+			if (this.multi)
+				task.elBtnEdit.onclick = sc_EditTask;
+		}
+	}
+
+	if (this.multi)
+		this.createAddTaskButton();
+}
+Status.prototype.createAddTaskButton = function()
+{
+	let el = document.createElement('div');
+	el.classList.add('button');
+	el.textContent = 'Add Task';
+	el.m_status = this;
+	el.onclick = function(e){
+		e.stopPropagation();
+		sc_AddTask(e.currentTarget.m_status);
+		return false;
+	};
+
+	if (this.args.tasks_badges)
+		this.elTasksBadges.appendChild(el);
+	else
+		this.elTasks.appendChild(el);
+}
 
 Status.prototype.update = function(i_status)
 {
@@ -477,42 +556,9 @@ function st_SetElArtists(i_status, i_el, i_short, i_clickable, i_onclick)
 
 	for (let i = 0; i < i_status.artists.length; i++)
 	{
-		let el = document.createElement('div');
+		let el = st_CreateElArtist(i_status.artists[i], i_short);
 		elements.push(el);
 		i_el.appendChild(el);
-		el.classList.add('tag');
-		el.classList.add('artist');
-		el.textContent = c_GetUserTitle(i_status.artists[i], null, i_short);
-
-		if (g_users[i_status.artists[i]] && g_users[i_status.artists[i]].disabled)
-			el.classList.add('disabled');
-
-		if (i_short)
-		{
-			el.classList.add('short');
-			if (g_auth_user && (g_auth_user.id == i_status.artists[i]))
-				el.title = 'It`s me!';
-			else
-				el.title = c_GetUserTitle(i_status.artists[i]);
-		}
-
-		if (g_auth_user && (g_auth_user.id == i_status.artists[i]))
-		{
-			el.classList.add('me');
-
-			if (i_short !== true)
-			{
-				el.title = 'It`s me!\n - may be i should do something here?';
-			}
-		}
-
-		let avatar = c_GetAvatar(i_status.artists[i]);
-		if (avatar)
-		{
-			el.classList.add('with_icon');
-			el.style.backgroundImage = 'url(' + avatar + ')';
-		}
-
 		el.m_name = i_status.artists[i];
 		st_TagHilight(el, 'artist');
 
@@ -526,6 +572,44 @@ function st_SetElArtists(i_status, i_el, i_short, i_clickable, i_onclick)
 	}
 
 	return elements;
+}
+function st_CreateElArtist(i_id, i_short)
+{
+	let el = document.createElement('div');
+	el.classList.add('tag');
+	el.classList.add('artist');
+	el.textContent = c_GetUserTitle(i_id, null, i_short);
+
+	if (g_users[i_id] && g_users[i_id].disabled)
+		el.classList.add('disabled');
+
+	if (i_short)
+	{
+		el.classList.add('short');
+		if (g_auth_user && (g_auth_user.id == i_id))
+			el.title = 'It`s me!';
+		else
+			el.title = c_GetUserTitle(i_id);
+	}
+
+	if (g_auth_user && (g_auth_user.id == i_id))
+	{
+		el.classList.add('me');
+
+		if (i_short !== true)
+		{
+			el.title = 'It`s me!\n - may be i should do something here?';
+		}
+	}
+
+	let avatar = c_GetAvatar(i_id);
+	if (avatar)
+	{
+		el.classList.add('with_icon');
+		el.style.backgroundImage = 'url(' + avatar + ')';
+	}
+
+	return el;
 }
 function st_SetElFlags(i_status, i_elFlags, i_short, i_clickable)
 {
@@ -1233,7 +1317,7 @@ Status.prototype.editProcess = function(i_args) {
 			statuses.push(this);
 	}
 
-	if (document.location.hostname == 'localhost')
+	if (1)//document.location.hostname == 'localhost')
 	{
 	let obj = {};
 
@@ -1500,17 +1584,33 @@ function st_StatusesSaved(i_data)
 	{
 		for (let sdata of i_data.statuses)
 		{
+			// Update current status:
 			if (sdata.path == g_CurPath())
 			{
 				RULES.status = sdata.status;
 				st_Show(sdata.status);
-				continue;
 			}
 
+			// Update other statuses (scene shots view):
 			if (st_Statuses[sdata.path])
 			{
 				st_Statuses[sdata.path].show(sdata.status);
 			}
+
+			// Update navigation folders
+			let el = g_elFolders[sdata.path];
+			if (el == null) continue;
+
+			let fstat = el.m_fobject.status;
+			if (fstat)
+			{
+				// Update only if status time > folder status time
+				if (fstat.ctime && (fstat.ctime >= sdata.status.time)) continue;
+				if (fstat.mtime && (fstat.mtime >= sdata.status.time)) continue;
+			}
+
+			// Update folder status:
+			g_FolderSetStatus(sdata.status, el);
 		}
 	}
 

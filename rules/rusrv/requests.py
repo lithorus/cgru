@@ -269,6 +269,22 @@ class Requests:
         o_out['makefolder'] = dirname
 
 
+    def req_copytemplate(self, i_args, o_out):
+        if self.session.USER_ID is None:
+            o_out['error'] = 'Guests are not allowed create new assets.'
+            return
+
+        template    = None
+        destination = None
+        names       = None
+
+        if 'template'    in i_args: template    = i_args['template']
+        if 'destination' in i_args: destination = i_args['destination']
+        if 'names'       in i_args: names       = i_args['names']
+
+        rulib.functions.copyTemplate(self.session.USER_ID, template, destination, names, o_out)
+
+
     def req_makenews(self, i_args, o_out):
         rulib.news.makeNewsAndBookmarks(i_args, self.session.USER_ID, o_out)
         return
@@ -319,7 +335,7 @@ class Requests:
             o_out['error'] = 'Guests are not allowed to edit tasks.'
             return
 
-        if not 'path' in i_args:
+        if not 'paths' in i_args:
             out['error'] = 'Path is not specified.'
             return
 
@@ -341,7 +357,38 @@ class Requests:
         if 'deleted'    in i_args: deleted    = i_args['deleted']
         if 'nonews'     in i_args and i_args['nonews']: nonews = True
 
-        rulib.setTask(uid=self.session.USER_ID, path=i_args['path'], name=name, tags=tags, artists=artists, flags=flags, progress=progress, annotation=annotation, deleted=deleted, nonews=nonews, out=out)
+        rulib.setTask(uid=self.session.USER_ID, paths=i_args['paths'], name=name, tags=tags, artists=artists, flags=flags, progress=progress, annotation=annotation, deleted=deleted, nonews=nonews, out=out)
+
+        return
+
+
+    def req_setcomment(self, i_args, out):
+
+        if not 'paths' in i_args:
+            out['error'] = 'Path is not specified.'
+            return
+
+        key        = None
+        text       = None
+        ctype      = None
+        tags       = None
+        duration   = None
+        color      = None
+        uploads    = None
+        deleted    = None
+        nonews     = False
+
+        if 'key'        in i_args: key        = i_args['key']
+        if 'text'       in i_args: text       = i_args['text']
+        if 'ctype'      in i_args: ctype      = i_args['ctype']
+        if 'tags'       in i_args: tags       = i_args['tags']
+        if 'duration'   in i_args: duration   = i_args['duration']
+        if 'color'      in i_args: color      = i_args['color']
+        if 'uploads'    in i_args: uploads    = i_args['uploads']
+        if 'deleted'    in i_args: deleted    = i_args['deleted']
+        if 'nonews'     in i_args and i_args['nonews']: nonews = True
+
+        rulib.setComment(uid=self.session.USER_ID, paths=i_args['paths'], text=text, ctype=ctype, tags=tags, duration=duration, color=color, uploads=uploads, deleted=deleted, nonews=nonews, out=out, key=key)
 
         return
 

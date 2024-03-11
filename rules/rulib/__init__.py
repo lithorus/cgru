@@ -23,7 +23,17 @@ SKIPFILES = ['.', '..', HT_ACCESS_FILE_NAME, HT_GROUPS_FILE_NAME, HT_DIGEST_FILE
 GUESTCANCREATE = ['status.json', 'comments.json']
 GUESTCANEDIT = ['comments.json']
 
+if len(RULES_TOP) == 0:
+    CGRU_LOCATION = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
+    os.environ['CGRU_LOCATION'] = CGRU_LOCATION
+    os.environ['AF_ROOT'] = os.path.join(CGRU_LOCATION, 'afanasy')
+
+    sys.path.append(os.path.join(CGRU_LOCATION, 'lib', 'python'))
+    sys.path.append(os.path.join(CGRU_LOCATION, 'afanasy', 'python'))
+
+
+from . import comments
 from . import editobj
 from . import functions
 from . import news
@@ -32,15 +42,8 @@ from . import status
 
 
 if len(RULES_TOP) == 0:
-    CGRU_LOCATION = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
     CGRU_VERSION = functions.fileRead(os.path.join(CGRU_LOCATION,'version.txt'))
-
-    os.environ['CGRU_LOCATION'] = CGRU_LOCATION
     os.environ['CGRU_VERSION'] = CGRU_VERSION
-    os.environ['AF_ROOT'] = os.path.join(CGRU_LOCATION, 'afanasy')
-
-    sys.path.append(os.path.join(CGRU_LOCATION, 'lib', 'python'))
-    sys.path.append(os.path.join(CGRU_LOCATION, 'afanasy', 'python'))
 
     RULES_TOP = functions.getRulesUno(CGRU_LOCATION,'rules')
 
@@ -52,9 +55,11 @@ if len(RULES_TOP) == 0:
             ROOT = os.path.join(CGRU_LOCATION, RULES_TOP['root'])
 
 
-def setStatus(paths=[None], uid=None, name=None, tags=None, tags_keep=None, artists=None, artists_keep=None, flags=None, flags_keep=None, progress=None, annotation=None, color=None, nonews=False, out=None):
+def setStatus(paths=None, uid=None, name=None, tags=None, tags_keep=None, artists=None, artists_keep=None, flags=None, flags_keep=None, progress=None, annotation=None, color=None, nonews=False, out=None):
     if out is None:
         out = dict()
+    if paths is None or paths == []:
+        paths = [None]
 
     statuses = []
     some_progress_changed = False
@@ -88,27 +93,39 @@ def setStatus(paths=[None], uid=None, name=None, tags=None, tags_keep=None, arti
     return out
 
 
-def setTask(path=None, uid=None, name=None, tags=None, artists=None, flags=None, progress=None, annotation=None, deleted=None, nonews=False, out=None):
+def setTask(paths=None, uid=None, name=None, tags=None, artists=None, flags=None, progress=None, annotation=None, deleted=None, nonews=False, out=None):
     if out is None:
         out = dict()
+    if paths is None or paths == []:
+        paths = [None]
 
-    st = status.Status(uid, path)
+    statuses = []
+    tasks = dict()
+    some_progress_changed = False
 
-    st.setTask(tags=tags, artists=artists, flags=flags, progress=progress, annotation=annotation, deleted=deleted, out=out)
+    for path in paths:
+        st = status.Status(uid, path)
+        task = st.setTask(name=name, tags=tags, artists=artists, flags=flags, progress=progress, annotation=annotation, deleted=deleted, out=out)
+        if task is None or 'error' in out:
+            break
+        if st.progress_changed:
+            some_progress_changed = True
+        statuses.append(st)
+        tasks[path] = task
 
-    if 'error' in out:
-        return out
+    functions.userChangedTasks(uid, tasks)
 
     # News & Bookmarks:
     # At first we should emit news,
     # as some temporary could be added for news.
     # For example task.changed = true
-    news.statusesChanged([st], out, nonews)
+    news.statusesChanged(statuses, out, nonews)
 
     out['statuses'] = []
     _out = dict()
-    st.save(_out)
-    out['statuses'].append({"path":st.path,"status":st.data})
+    for st in statuses:
+        st.save(_out)
+        out['statuses'].append({"path":st.path,"status":st.data})
 
     if st.progress_changed:
         progresses = dict()
@@ -116,3 +133,36 @@ def setTask(path=None, uid=None, name=None, tags=None, artists=None, flags=None,
         status.updateUpperProgresses(os.path.dirname(st.path), progresses, out)
 
     return out
+
+def setComment(paths=None, uid=None, ctype=None, text=None, tags=None, duration=None, color=None, uploads=None, deleted=False, nonews=None, out=None, key=None):
+    if out is None:
+        out = dict()
+    if paths is None or paths == []:
+        paths = [None]
+ 
+    path_cdata = dict()
+    for path in paths:
+        cms = comments.Comments(uid, path)
+
+        _out = dict()
+        cdata = cms.add(ctype=ctype, text=text, tags=tags, duration=duration, color=color, uploads=uploads, deleted=deleted, out=_out, key=key)
+        if 'error' in _out:
+            out['error'] = _out['error']
+            return out
+        if cdata is None:
+            return
+
+        path_cdata[path] = cdata
+        _out = dict()
+        cms.save(_out)
+
+        if 'error' in _out:
+            out['error'] = _out['error']
+            return out
+
+    news.commentsChanged(path_cdata, uid=uid, out=out, nonews=nonews)
+
+    out['comments'] = path_cdata
+
+    return out
+

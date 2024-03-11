@@ -71,6 +71,8 @@ public:
 	static AttrNumber saveGUIOnExit;
 	static AttrNumber saveHotkeysOnExit;
 	static AttrNumber showOfflineNoise;
+	static AttrNumber showServerName;
+	static AttrNumber showServerPort;
 
 	static AttrColor clr_Window;
 	static AttrColor clr_WindowText;
@@ -138,6 +140,7 @@ public:
 
 	static QFont f_name;
 	static QFont f_info;
+	static QFont f_thin;
 	static QFont f_muted;
 	static QFont f_plotter;
 	static QFont f_min;

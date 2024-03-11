@@ -169,9 +169,6 @@ void Block::v_errorHostsReset()
 
 bool Block::v_startTask( af::TaskExec * taskexec, RenderAf * render, MonitorContainer * monitoring)
 {
-   // Store block name in task executable:
-   taskexec->setBlockName( m_data->getName());
-
    // Set variable capacity to maximum value:
    if( m_data->canVarCapacity() && (taskexec->getCapacity() > 0))
    {
@@ -401,9 +398,12 @@ bool Block::v_refresh( time_t currentTime, RenderContainer * renders, MonitorCon
 			if (checkTasksDependStatus(monitoring))
 				blockProgress_changed = true;
 
-		// Update block tasks progress and bars
+		// Update block tasks progress and status
 		if (m_data->updateProgress(m_jobprogress))
 			blockProgress_changed = true;
+
+		// Update progress bars for GUIs:
+		m_data->updateBars(m_jobprogress);
 	}
 
 	if (old_block_state != m_data->getState())
@@ -434,6 +434,13 @@ bool Block::checkBlockDependStatus(MonitorContainer * i_monitoring)
 	if( now_depend != was_depend )
 	{
 		m_data->setStateDependent( now_depend);
+
+		if (false == now_depend)
+		{
+			// If the block just stop to depend, its status should be recalculated.
+			// Or it will loose depend state and will not get ready state evet if it has ready tasks.
+			m_data->updateProgress(m_jobprogress);
+		}
 
 		if( i_monitoring )
 			i_monitoring->addBlock( af::Msg::TBlocksProgress, m_data);

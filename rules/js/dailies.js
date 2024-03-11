@@ -100,19 +100,55 @@ function d_Make(i_path, i_outfolder)
 
 	d_params.general.artist = {"width": '50%'};
 	params.artist = c_GetUserTitle();
-	if (RULES.status && RULES.status.artists && RULES.status.artists.length)
-	{
-		if (RULES.status.artists.indexOf(g_auth_user.id) == -1)
-			params.artist = c_GetUserTitle(RULES.status.artists[0]);
 
-		var artists = [];
-		for (var i = 0; i < RULES.status.artists.length; i++)
-			artists.push(c_GetUserTitle(RULES.status.artists[i]));
-		if (artists.indexOf(c_GetUserTitle()) == -1)
-			artists.push(c_GetUserTitle());
-		if (artists.length > 1)
-			d_params.general.artist.pulldown = artists;
+	// Collect artists
+	let artists = [];
+    if (RULES.status && RULES.status.tasks)
+    {
+		if (activity_Current && RULES.status.tasks[activity_Current])
+		{
+			// Collect artist from current task if selected
+			let task = RULES.status.tasks[activity_Current];
+			if (task.artists && task.artists.length)
+				artists = task.artists;
+		}
+		else for (let task in RULES.status.tasks)
+		{
+			// Collect artists from all tasks
+			task = RULES.status.tasks[task];
+			if (task.deleted) continue;
+			if (task.artists && task.artists.length)
+				for (let artist of task.artists)
+					if (artists.indexOf(artist) == -1)
+						artists.push(artist);
+		}
+    }
+    if (RULES.status && RULES.status.artists && RULES.status.artists.length)
+    {
+		// Collect attists from status
+		for (let artist of RULES.status.artists)
+			if (artists.indexOf(artist) == -1)
+				artists.push(artist);
 	}
+	if (artists.length)
+	{
+		if (artists.indexOf(g_auth_user.id) == -1)
+		{
+			// If currect user does not exist we should add him.
+			// And choose the first from artists.
+			artists.push(g_auth_user.id);
+			params.artist = c_GetUserTitle(artists[0]);
+		}
+		if (artists.length > 1)
+		{
+			// Create a pull down menu of artists
+			let usrTitles = [];
+			for (let artist of artists)
+				usrTitles.push(c_GetUserTitle(artist));
+			d_params.general.artist.pulldown = usrTitles;
+		}
+	}
+
 
 	var dateObj = new Date();
 	var date = '' + dateObj.getFullYear();
@@ -1081,7 +1117,8 @@ function d_WmDiscard(i_wm)
 ########################################################################################################### */
 
 var d_cutparams = {
-	cut_name      : {},
+	cut_name      : {'width': '30%'},
+	audio         : {'width': '70%'},
 	input         : {},
 	fps           : {"label": 'FPS', 'width': '25%'},
 	af_pertask    : {"label": 'Frames Per Task', 'width': '25%', 'lwidth': '140px'},
@@ -1103,6 +1140,7 @@ function d_MakeCut(i_args)
 
 	var params = {};
 	params.cut_name = i_args.cut_name;
+	params.audio = c_PathPM_Rules2Client(g_CurPath()) + '/REF/' + params.cut_name + '.flac';
 	params.output = c_PathPM_Rules2Client(i_args.output);
 	params.input = RULES.assets.shot.result.path.join(',');
 	params.fps = RULES.fps;
@@ -1192,12 +1230,13 @@ function d_CutProcessGUI(i_wnd, i_test)
 
 	var cmd = 'rules/bin/makecut.sh';
 
-	cmd += ' -i "' + params.input + '"';
-	cmd += ' -n "' + params.cut_name + '"';
-	cmd += ' -u "' + g_auth_user.id + '"';
-	cmd += ' -f "' + params.fps + '"';
-	cmd += ' -r "' + params.format + '"';
-	cmd += ' -c "' + params.codec + '"';
+	cmd += ' --inputs "'     + params.input      + '"';
+	cmd += ' --audio "'      + params.audio      + '"';
+	cmd += ' --cutname "'    + params.cut_name   + '"';
+	cmd += ' --afuser "'     + g_auth_user.id    + '"';
+	cmd += ' --fps "'        + params.fps        + '"';
+	cmd += ' --resolution "' + params.format     + '"';
+	cmd += ' --codec "'      + params.codec      + '"';
 	cmd += ' --colorspace "' + params.colorspace + '"';
 
 	if (params.getcomments)

@@ -82,6 +82,38 @@ function FilesView(i_args)
 	else
 		this.elRoot.style.background = u_background;
 
+	// Closed widged
+	this.elClosed = document.createElement('div');
+	this.elRoot.appendChild(this.elClosed);
+	this.elClosed.classList.add('closed');
+
+	this.elClosedOpen = document.createElement('div');
+	this.elClosed.appendChild(this.elClosedOpen);
+	this.elClosedOpen.classList.add('button');
+	this.elClosedOpen.textContent = 'open';
+	this.elClosedOpen.m_view = this;
+	this.elClosedOpen.onclick = function(e) {e.currentTarget.m_view.open();}
+
+	c_CreateOpenButton({"parent": this.elClosed, "path": this.path});
+
+	let elLink = document.createElement('a');
+	this.elClosed.appendChild(elLink);
+	elLink.href = '#' + this.path;
+	let lText = this.path;
+	if (ASSET && ASSET.path)
+	{
+		lText = lText.replace(ASSET.path, '');
+		if (lText[0] == '/')
+			lText = lText.substr(1);
+	}
+	elLink.classList.add('path');
+	elLink.textContent = lText;
+
+	this.elClosedInfo = document.createElement('div');
+	this.elClosed.appendChild(this.elClosedInfo);
+	this.elClosedInfo.classList.add('info');
+
+	// Control panel
 	this.elPanel = document.createElement('div');
 	this.elRoot.appendChild(this.elPanel);
 	this.elPanel.classList.add('panel');
@@ -291,6 +323,8 @@ generate thumbnails.";
 	this.elRoot.appendChild(this.elView);
 	this.elView.classList.add('view');
 
+	this.processOpenClose();
+
 	fv_views.push(this);
 
 	this.show();
@@ -311,37 +345,65 @@ FilesView.prototype.setLocalStorageAttr = function(i_attr_name, i_attr_value) {
 };
 
 FilesView.prototype.limitsAdd = function() {
-	var limits = [1, 3, 10, 30, 0];
+	let limits = [1, 3, 10, 30, 0];
+
+	let elLimitsDiv = document.createElement('div');
+	elLimitsDiv.classList.add('limits');
+	this.elPanel.appendChild(elLimitsDiv);
 
 	this.elLimits = [];
 
-	for (var i = 0; i < limits.length; i++)
+	for (let lim of limits)
 	{
-		var elLimit = document.createElement('div');
-		this.elPanel.appendChild(elLimit);
+		let elLimit = document.createElement('div');
+		elLimitsDiv.appendChild(elLimit);
 		this.elLimits.push(elLimit);
-		elLimit.classList.add('limit');
 		elLimit.classList.add('button');
 
-		var text = limits[i];
+		let text = lim;
 		if (text == 0)
 		{
 			text = 'all';
 			elLimit.title = 'Show all items';
 		}
 		else
-			elLimit.title = 'Show last ' + limits[i] + ' items';
+			elLimit.title = 'Show last ' + lim + ' items';
 		elLimit.textContent = text;
 
-		elLimit.m_limit = limits[i];
+		elLimit.m_limit = lim;
 		elLimit.m_view = this;
 		elLimit.onclick = function(e) {
-			var fv = e.currentTarget.m_view;
+			let fv = e.currentTarget.m_view;
 			fv.setLocalStorageAttr('limit', e.currentTarget.m_limit);
 			fv.limitApply();
 		}
 	}
+
+	let elClose = document.createElement('div');
+	elLimitsDiv.appendChild(elClose);
+	elClose.classList.add('button','close');
+	elClose.textContent = 'close';
+	elClose.m_view = this;
+	elClose.onclick = function(e) {e.currentTarget.m_view.close();}
 };
+
+FilesView.prototype.close = function()
+{
+	this.setLocalStorageAttr('closed','ON');
+	this.processOpenClose();
+}
+FilesView.prototype.open = function()
+{
+	this.setLocalStorageAttr('closed','OFF');
+	this.processOpenClose();
+}
+FilesView.prototype.processOpenClose = function()
+{
+	if (this.getLocalStorageAttr('closed') == 'ON')
+		this.elRoot.classList.add('closed');
+	else
+		this.elRoot.classList.remove('closed');
+}
 
 FilesView.prototype.limitApply = function() {
 	if (false == this.has_limits)
@@ -431,14 +493,14 @@ FilesView.prototype.show = function() {
 };
 
 FilesView.prototype.showCounts = function() {
-	var folders_count = 0;
-	var files_count = 0;
-	var frames_count = 0;
-	var size_count = 0;
-	var space_count = 0;
+	let folders_count = 0;
+	let files_count = 0;
+	let frames_count = 0;
+	let size_count = 0;
+	let space_count = 0;
 
 	if (this.walk.folders)
-		for (var i = 0; i < this.walk.folders.length; i++)
+		for (let i = 0; i < this.walk.folders.length; i++)
 			if (false == fv_SkipFile(this.walk.folders[i].name))
 			{
 				folders_count++;
@@ -454,7 +516,7 @@ FilesView.prototype.showCounts = function() {
 			}
 
 	if (this.walk.files)
-		for (var i = 0; i < this.walk.files.length; i++)
+		for (let i = 0; i < this.walk.files.length; i++)
 			if (false == fv_SkipFile(this.walk.files[i].name))
 			{
 				if (this.walk.files[i].size)
@@ -466,7 +528,7 @@ FilesView.prototype.showCounts = function() {
 				files_count++;
 			}
 
-	var counts = '';
+	let counts = '';
 	if (folders_count)
 		counts += ' Dirs:' + folders_count;
 	if (files_count)
@@ -479,7 +541,7 @@ FilesView.prototype.showCounts = function() {
 
 	if (frames_count)
 	{
-		var el = document.createElement('div');
+		let el = document.createElement('div');
 		this.elCounts.appendChild(el);
 		el.classList.add('frames_count');
 		el.textContent = 'sF:' + frames_count;
@@ -492,6 +554,24 @@ FilesView.prototype.showCounts = function() {
 			fv_refreshAttrs();
 		}
 	}
+
+	// Closed widget
+	let info = '';
+	if (folders_count)
+	{
+		info += folders_count + ' folder';
+		if (folders_count > 1)
+			info += 's';
+	}
+	if (files_count)
+	{
+		if (folders_count)
+			info += ' and ';
+		info += files_count + ' file';
+		if (files_count > 1)
+			info += 's';
+	}
+	this.elClosedInfo.textContent = info;
 };
 
 FilesView.prototype.refreshAttrs = function() {
@@ -630,16 +710,38 @@ FilesView.prototype.showAttrs = function(i_el, i_obj) {
 		}
 	}
 
-	var video = i_el.m_obj.video;
+	let video = i_el.m_obj.video;
 	if (video)
 	{
+		if (video.frame_count)
+		{
+			if (i_el.m_el_num_files == null)
+			{
+				i_el.m_el_num_files = document.createElement('div');
+				i_el.m_elBody.appendChild(i_el.m_el_num_files);
+				i_el.m_el_num_files.classList.add('filesnum');
+				i_el.m_el_num_files.classList.add('attr');
+			}
+
+			i_el.m_el_num_files.textContent = 'F:' + video.frame_count;
+			i_el.m_el_num_files.title = 'Frames quantity: ' + video.frame_count + '\nDouble click to update status frames number.';
+			i_el.m_el_num_files.m_num_files = video.frame_count;
+			i_el.m_el_num_files.onclick = function(e) { e.stopPropagation(); };
+			i_el.m_el_num_files.ondblclick = function(e) {
+				e.stopPropagation();
+				st_SetFramesNumber(e.currentTarget.m_num_files);
+				fv_refreshAttrs();
+			};
+		}
+
 		if (i_el.m_el_mediainfo == null)
 		{
 			i_el.m_el_mediainfo = document.createElement('div');
 			i_el.m_elBody.appendChild(i_el.m_el_mediainfo);
 			i_el.m_el_mediainfo.classList.add('mediainfo');
 		}
-		var info = '';
+
+		let info = '';
 		if (video.width && video.height)
 			info += ' ' + video.width + 'x' + video.height;
 		if (video.frame_count && video.fps)
@@ -654,12 +756,10 @@ FilesView.prototype.showAttrs = function(i_el, i_obj) {
 			info += '/' + video.chromasubsampling;
 		if (video.chromasubsampling)
 			info += '/' + video.bitdepth;
-		if (video.frame_count)
-			info += ' ' + video.frame_count + 'f';
 		i_el.m_el_mediainfo.textContent = info;
 	}
 
-	var exif = i_el.m_obj.exif;
+	let exif = i_el.m_obj.exif;
 	if (exif)
 	{
 		if (i_el.m_el_mediainfo == null)
@@ -668,7 +768,7 @@ FilesView.prototype.showAttrs = function(i_el, i_obj) {
 			i_el.m_elBody.appendChild(i_el.m_el_mediainfo);
 			i_el.m_el_mediainfo.classList.add('mediainfo');
 		}
-		var info = '';
+		let info = '';
 		if (exif.width && exif.height) info += ' ' + exif.width + 'x' + exif.height;
 		//if (exif.bitdepth) info += ' ' + exif.bitdepth;
 		//if (exif.colortype) info += ' ' + exif.colortype;

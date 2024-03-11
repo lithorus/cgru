@@ -7,6 +7,10 @@ body, #header, #footer, #navig_div, #sidepanel_div, #content, .gui_size_handle {
 background-color: #A0A0A0;
 }
 
+#header, #footer, #navig_div, #sidepanel_div, #content, .gui_size_handle {
+background: inherit;
+}
+
 #header, #footer {
 -o-transition: all .3s ease-in-out;
 -moz-transition: all .3s ease-in-out;
@@ -96,6 +100,7 @@ box-shadow: 0 0 6px rgb(100,255,255), 0 0 4px rgba(255,255,255,.5) inset;
 border: 2px solid rgb(255,255,120);
 box-shadow: 0 0 8px rgb(255,255,120), 0 0 4px rgba(255,255,255,.5) inset;
 }
+.activity_filtered {display:none;}
 
 #profile_settings {
 display: none;
@@ -191,14 +196,28 @@ top: 38px; bottom: 38px;
 -webkit-user-select: none;
 }
 /* =========== NAVIGATION: ============ */
-#navig_div { position: absolute; width: 300px; left: 0; }
+#navig_div {
+position: absolute; width: 300px; left: 0;
+}
+#navig {
+position: absolute;
+overflow-y: scroll;
+background: inherit;
+left: 0; right: 6px; top: 20px; bottom: 0; /*padding-right: 6px;*/
+}
 #navig_handle {
 position: absolute;
 right: 0; top: 0; bottom: 0;
 width: 2px;
 }
-#navig_panel { position: absolute; height: 20px; left:0;right:0;top:0; box-shadow:0 0 4px #000, 0 0 4px rgba(255,255,255,.4) inset;}
-#navig_panel .button {
+#navig_panel{
+background: inherit;
+position: absolute;
+height: 20px;
+left:0;right:0;top:0;
+box-shadow:0 0 4px #000, 0 0 4px rgba(255,255,255,.4) inset;
+}
+#navig_div .navig_buttons .button {
 font-size: 12px;
 padding: 0px;
 margin: 2px;
@@ -206,8 +225,21 @@ float: left;
 width: 40px;
 text-align: center;
 }
-#navig_panel .button.small { width: 20px; }
-#navig { position: absolute; overflow-y: scroll; left: 0; right: 6px; top: 20px; bottom: 0; /*padding-right: 6px;*/ }
+#navig_div .navig_buttons .button.small { width: 20px; }
+#navig_settings {
+background: inherit;
+position: absolute;
+left: 0; right: 0;
+top: 20px;
+/*height: 100px;*/
+box-shadow:0 0 4px #000, 0 0 4px rgba(255,255,255,.4) inset;
+/*border: 2px solid #F00;*/
+}
+#navig_filters {font-size: 12px;}
+#navig_filters div {float: left;}
+.navig_filter {border-radius: 4px; border: 2px solid rgba(98,98,98,.5);}
+#navig_settings .flag {}
+#navig_settings .flag.selected {box-shadow: 0 0 6px #8FF, 0 0 6px #8FF inset;}
 #navig .folder {
 clear: both;
 position: relative;
@@ -503,7 +535,6 @@ border-radius: 4px;
 .task_badge .artist {margin: 0px; padding-top: 2px;; padding-bottom: 2px;}
 .task_badge .progress {clear: both; width: 100%}
 .task_badge .progressbar {height: 6px;}
-.task_badge.activity_filtered {display:none;}
 
 
 /* ========================================================= */
@@ -575,9 +606,10 @@ position: relative;
 border-top: 1px solid rgba(98,98,98,.5);
 padding-bottom: 2px;
 }
-#news .news.assigned          { background: rgba(   0, 255,   0, .2); }
-#news .news.cur_path          { background: rgba( 100, 255, 255, .2); }
-#news .news.assigned.cur_path { background: rgba(   0, 255, 150, .2); }
+#news .news.assigned          { box-shadow: 0 0 18px #33FF33 inset; }
+#news .news.cur_path          { box-shadow: 0 0 18px #77FFFF inset; }
+#news .news.news_selected     { box-shadow: 0 0 18px #FF7700 inset; }
+#news .news.assigned.cur_path { box-shadow: 0 0 18px #00FFAA inset; }
 #news .news_label { font-size: 12px; margin: 4px 0 0 0; }
 #news .news .status {float: right; font-size: 10px;}
 #news .news .status .flag {_float: none;}
@@ -664,6 +696,7 @@ padding: 4px 10px 0 0;
 #bookmarks .bookmark a {
 padding: 0 12px;
 }
+#bookmarks .bookmark .thumb_div {float: left;}
 #bookmarks .bookmark img {
 width: 100%;
 }
@@ -672,6 +705,7 @@ float: right;
 font-size: 10px;
 }
 #bookmarks .bookmark .status .flags {float: left;}
+#bookmarks .bookmark .status .tasks {clear: none;}
 #bookmarks .bookmark .bar {
 _position: absolute;
 bottom: 1px;
@@ -680,7 +714,10 @@ height: 4px;
 background-color: rgba(0,200,0,.5);
 opacity: 0.5;
 }
-#bookmarks .bookmark.cur_path { background: rgba( 100, 255, 255, .2); }
+#bookmarks .bookmark.cur_path {
+/*background: rgba( 100, 255, 255, .2);*/
+box-shadow: 0 0 4px rgba(100,255,255,1), 0 0 16px rgba(100,255,255,1) inset;
+}
 #bookmarks .bookmark .button.delete {
 display: none;
 float: right;
@@ -872,41 +909,41 @@ border-radius: 8px;
 #status_tasks_buttons {float: right; margin: 1px 12px; padding: 1px 12px;}
 #status_tasks_buttons .button {float: right; margin: 1px 12px; padding: 1px 12px;}
 #status_tasks_label   {float: left; margin: 6px 12px; padding: 1px 12px;}
-#status_tasks         {clear: both; margin: 4px;}
-#status_tasks .task {
+.status .tasks         {clear: both; margin: 4px;}
+.status .tasks .task {
 margin: 8px 4px;
 padding: 8px 4px 0px 4px;
 border-radius: 4px;
 border: 2px solid rgba(98,98,98,.5);
 }
-#status_tasks .task.selected {
+.status .tasks .task.selected {
 border: 2px solid rgba(100,255,255,1);
 box-shadow: 0 0 4px rgba(100,255,255,1), 0 0 4px rgba(100,255,255,1) inset;
 }
-#status_tasks .task.edit {
+.status .tasks .task.edit {
 border: 2px solid rgba(255,255,0,1);
 }
-#status_tasks .task.deleted            {display: none;}
-#status_tasks .task .show_div          {clear: both;}
-#status_tasks .task .show_div .artists {float: left;}
-#status_tasks .task .show_div .flags   {float: left;}
-#status_tasks .task .show_div .percent {float: right;}
-#status_tasks .task .edit_div          {clear: both;}
-#status_tasks .task .edit_div .tags    {float: left;}
-#status_tasks .task .edit_div .percent {float: right; width: 64px;}
-#status_tasks .task .edit_div .percent .label {float: right; padding: 2px; margin: 2px; margin-right: 8px;}
-#status_tasks .task .edit_div .annotation {margin: 4px; border-top: 1px solid rgba(98,98,98,.5);}
-#status_tasks .task .progress          {clear: both; border-radius: 4px;}
-#status_tasks .task .progressbar       {height: 6px; border-radius: 2px;}
-#status_tasks .task .info              {font-style: italic; font-size: 10px;}
-#status_tasks .task .show_div .name {
+.status .tasks .task.deleted            {display: none;}
+.status .tasks .task .show_div          {clear: both;}
+.status .tasks .task .show_div .artists {float: left;}
+.status .tasks .task .show_div .flags   {float: left;}
+.status .tasks .task .show_div .percent {float: right;}
+.status .tasks .task .edit_div          {clear: both;}
+.status .tasks .task .edit_div .tags    {float: left;}
+.status .tasks .task .edit_div .percent {float: right; width: 64px;}
+.status .tasks .task .edit_div .percent .label {float: right; padding: 2px; margin: 2px; margin-right: 8px;}
+.status .tasks .task .edit_div .annotation {margin: 4px; border-top: 1px solid rgba(98,98,98,.5);}
+.status .tasks .task .progress          {clear: both; border-radius: 4px;}
+.status .tasks .task .progressbar       {height: 6px; border-radius: 2px;}
+.status .tasks .task .info              {font-style: italic; font-size: 10px;}
+.status .tasks .task .show_div .name {
 float: left;
 cursor: pointer;
 margin: 1px 4px;
 padding: 1px 4px;
 border: 1px solid rgba(98,98,98,.5);
 }
-#status_tasks .task .show_div .name:hover {
+.status .tasks .task .show_div .name:hover {
 border: 1px solid rgba( 100, 255, 255);
 box-shadow: 0 0 4px rgba(100,255,255,1), 0 0 4px rgba(100,255,255,1) inset;
 }
@@ -1018,12 +1055,24 @@ padding: 0px 8px;
 }
 
 .filesview { /*border: 1px solid rgba(98,98,98,.5); border-radius: 2px;*/ }
+.filesview.closed { magrin: 0px; padding: 0px; }
+.filesview.closed .panel { display: none; }
+.filesview.closed .view { display: none; }
+.filesview.closed .closed { display: block; }
+.filesview .closed { display: none; }
+.filesview .closed div { float: left; margin: 2px 8px; }
+.filesview .closed .open { height: 14px; }
+.filesview .closed a { font-size: 12px; }
+.filesview .closed .info { font-size: 12px; float: right; margin: 2px 8px; }
+.filesview .closed .button { font-size: 12px; float: right; margin: 2px 8px; padding: 0; height: 14px; width: 50px; }
 .filesview .panel { /*border: 1px solid rgba(98,98,98,.5);*/ }
 .filesview .panel .button { width: 18px; height: 18px; }
 .filesview .panel .counts { clear:both; font: 14px monospace; }
 .filesview .panel .counts .frames_count { float: right; border: 1px solid rgba(98,98,98,.5); font-size: 12px; padding: 0px 4px; cursor: pointer; }
 .filesview .panel div, .filesview .panel a { float: left; margin: 0px 8px; }
-.filesview .panel .limit { font-size: 12px; float: left; margin: 4px 8px; padding: 0; height: 14px; width: 50px; }
+.filesview .panel .limits { float: none; }
+.filesview .panel .limits .button { font-size: 12px; float: left; margin: 4px 8px; padding: 0; height: 14px; width: 50px; }
+.filesview .panel .limits .button.close { float: right; }
 .filesview .panel .title { clear: both; font-weight: bold;}
 .filesview .panel .path { margin: 0px 8px; }
 .filesview .panel .thumbsdiv { float: right; /*border: 1px solid #000;*/ }
@@ -1187,6 +1236,17 @@ border-radius: 8px;
 #body_timecode_edit_value { border-radius: 2px; }
 
 #body_body { clear: both; }
+
+#location_info {
+font-size: 8px;
+font-style: italic;
+opacity: .7;
+text-align: right;
+-o-transition: all .3s ease-in-out;
+-moz-transition: all .3s ease-in-out;
+-webkit-transition: all .3s ease-in-out;
+}
+#location_info:hover {font-size: 14px; opacity: 1.0;}
 
 /* ========================================================= */
 /* =================== COMMENTS ============================ */
@@ -1420,14 +1480,27 @@ background-position: center;
 .artpage .brief .title {
 font-weight: bold;
 }
+.artpage .panel .button {float: left;}
+.artpage .panel .button.close {float: right;}
 .artpage.disabled .brief .title {
 text-decoration: line-through;
 font-style: italic;
 font-weight: normal;
 }
-.artpage_prj .title {
-font-weight: bold;
+.artpage_prj {
+border: 2px solid rgba(98,98,98,.5);
+border-radius: 2px;
+margin: 3px;
+padding: 3px;
 }
+.artpage_prj .title {font-weight: bold;}
+.artpage_prj .panel .button {float: right;}
+.artpage_prj .prj_act {
+border-top: 1px solid rgba(98,98,98,.5);
+margin: 1px;
+padding: 1px;
+}
+.artpage_prj .prj_act .name {float: left;}
 .artpage_bm {
 float: left;
 padding: 4px;
@@ -1441,6 +1514,20 @@ border-radius: 2px;
 font-style: italic;
 opacity: 0.5;
 }
+.artpage_act {
+border-top: 1px solid rgba(98,98,98,.5);
+margin: 1px;
+padding: 1px;
+}
+.artpage_act .path {float: left; font-size: 12px;}
+.artpage_act .cuser {float: left; font-size: 12px;}
+.artpage_act .muser {float: left; font-size: 12px;}
+.artpage_act .task {
+float: left;
+font-size: 12px;
+margin: 0px 20px;
+}
+.artpage_act .time {float: right; font-size: 12px;}
 .ab_bot_panel {
 margin: 8px;
 border-top: 1px solid rgba(98,98,98,.5);

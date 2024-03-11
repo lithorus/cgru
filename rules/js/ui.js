@@ -45,6 +45,9 @@ var u_resizing_name = null;
 var u_resizing_koeff = null;
 var u_resizing_x = null;
 
+var u_navig_filter_flags_exclude = [];
+var u_navig_filter_flags_include = [];
+
 function View_body_Open()
 {
 	u_BodyLoad();
@@ -117,6 +120,11 @@ function u_Init()
 	if (localStorage.execute_soft == null)
 		localStorage.execute_soft = 'OFF';
 	$('execute_soft').textContent = localStorage.execute_soft;
+	
+	if (localStorage.navig_filter_flags_include)
+		u_navig_filter_flags_include = localStorage.navig_filter_flags_include.split(',');
+	if (localStorage.navig_filter_flags_exclude)
+		u_navig_filter_flags_exclude = localStorage.navig_filter_flags_exclude.split(',');
 
 	u_CalcGUI();
 
@@ -216,6 +224,29 @@ function u_Process()
 	}
 
 	u_ExecuteShow(false);
+
+	u_NavigFiltersRefresh();
+
+	if (c_RuFileExists('location.json'))
+	{
+		n_GetFile({
+			"path": c_GetRuFilePath('location.json'),
+			"func": u_LocationInfoReceived,
+			"info": 'location.json',
+			"local": true
+		});
+	}
+}
+
+function u_LocationInfoReceived(i_data, i_args)
+{
+	let info = '';
+	if (i_data.cuser)
+		info += ' by ' + c_GetUserTitle(i_data.cuser);
+	if (i_data.ctime)
+		info += ' at ' + c_DT_StrFromSec(i_data.ctime);
+	if (info.length)
+		$('location_info').innerHTML = 'Created ' + info;
 }
 
 function u_Finish()
@@ -231,6 +262,8 @@ function u_Finish()
 	cm_Finish();
 
 	u_ViewsFuncsClose();
+
+	$('location_info').textContent = '';
 
 	$('body_avatar_c').style.display = 'none';
 	$('body_avatar_m').style.display = 'none';
@@ -261,23 +294,12 @@ function u_ShowHiddenToggle()
 	$('show_hidden').textContent = localStorage.show_hidden;
 }
 
-function u_CalcGUI(i_toggle_scrollbars)
+function u_CalcGUI()
 {
-	var barW = u_el.navig.offsetWidth - u_el.navig.clientWidth;
-	var sideW = parseInt(localStorage.sidepanel_width);
-	var sideClosedW = parseInt(localStorage.sidepanel_closed_width);
-	var navigW = parseInt(localStorage.navig_width);
-
-	if (localStorage.hide_scrollbars == null)
-		localStorage.hide_scrollbars = 'OFF';
-	if (i_toggle_scrollbars === true)
-	{
-		if (localStorage.hide_scrollbars == 'ON')
-			localStorage.hide_scrollbars = 'OFF';
-		else
-			localStorage.hide_scrollbars = 'ON';
-	}
-	$('hide_scrollbars').textContent = localStorage.hide_scrollbars;
+	let barW = u_el.navig.offsetWidth - u_el.navig.clientWidth;
+	let sideW = parseInt(localStorage.sidepanel_width);
+	let sideClosedW = parseInt(localStorage.sidepanel_closed_width);
+	let navigW = parseInt(localStorage.navig_width);
 
 	if (localStorage.sidepanel_opened == 'true')
 	{
@@ -290,46 +312,22 @@ function u_CalcGUI(i_toggle_scrollbars)
 		$('sidepanel').style.left = '0px';
 	}
 
-	if (localStorage.hide_scrollbars == 'ON')
+	$('navig_div').style.width = navigW + 'px';
+	$('navig').style.marginRight = '0px';
+
+	$('content').style.left = navigW + 'px';
+
+	if (localStorage.sidepanel_opened == 'true')
 	{
-		$('navig_div').style.width = (navigW - barW) + 'px';
-		$('navig').style.marginRight = (-barW) + 'px';
-
-		$('content').style.left = (navigW - barW) + 'px';
-
-
-		if (localStorage.sidepanel_opened == 'true')
-		{
-			$('content').style.right = (sideW - (2 * barW)) + 'px';
-			$('sidepanel_div').style.width = (sideW - barW) + 'px';
-			$('sidepanel').style.marginRight = (-barW) + 'px';
-		}
-		else
-		{
-			$('content').style.right = sideClosedW - barW + 'px';
-			$('sidepanel_div').style.width = sideClosedW + 'px';
-			$('sidepanel').style.marginRight = '-10px';
-		}
+		$('content').style.right = sideW + 'px';
+		$('sidepanel_div').style.width = sideW + 'px';
+		$('sidepanel').style.marginRight = '0px';
 	}
 	else
 	{
-		$('navig_div').style.width = navigW + 'px';
-		$('navig').style.marginRight = '0px';
-
-		$('content').style.left = navigW + 'px';
-
-		if (localStorage.sidepanel_opened == 'true')
-		{
-			$('content').style.right = sideW + 'px';
-			$('sidepanel_div').style.width = sideW + 'px';
-			$('sidepanel').style.marginRight = '0px';
-		}
-		else
-		{
-			$('content').style.right = sideClosedW + 'px';
-			$('sidepanel_div').style.width = sideClosedW + 'px';
-			$('sidepanel').style.marginRight = '-10px';
-		}
+		$('content').style.right = sideClosedW + 'px';
+		$('sidepanel_div').style.width = sideClosedW + 'px';
+		$('sidepanel').style.marginRight = '-10px';
 	}
 }
 
@@ -376,10 +374,12 @@ function u_ApplyStyles()
 	{
 		u_background = localStorage.background;
 		document.body.style.background = localStorage.background;
+/* It can be just inherited, no need to set it to children (background: inherit;)
 		var backs =
 			['header', 'footer', 'navig_div', 'sidepanel_div', 'content', 'navig_handle', 'sidepanel_handle'];
 		for (var i = 0; i < backs.length; i++)
 			$(backs[i]).style.background = localStorage.background;
+*/
 	}
 
 	if (localStorage.text_color && localStorage.text_color.length)
@@ -455,7 +455,122 @@ function u_RulesShow()
 	cgru_ShowObject(RULES, 'RULES ' + g_CurPath());
 }
 
-// function u_DrawColorBars( i_el, i_onclick, height)
+
+function u_NavigSettingsOnClick()
+{
+	let elSettings = $('navig_settings');
+	if (elSettings.m_opened)
+	{
+		elSettings.m_opened = false;
+		elSettings.style.display = 'none';
+		return;
+	}
+
+	elSettings.m_opened = true;
+	elSettings.style.display = 'block';
+
+	u_NavigFiltersRefresh();
+}
+function u_NavigFiltersRefresh()
+{
+//	if ($('navig_settings').m_opened != true)
+//		return;
+
+	localStorage.navig_filter_flags_exclude = u_navig_filter_flags_exclude.join(',');
+	localStorage.navig_filter_flags_include = u_navig_filter_flags_include.join(',');
+
+	let elFlagsEx = st_SetElFlags({"flags":u_navig_filter_flags_exclude}, $('navig_filter_flags_exclude'), true);
+	for (let el of elFlagsEx)
+	{
+		el.title = "Double click to remove.";
+		el.ondblclick = function(e)
+		{
+			u_navig_filter_flags_exclude = u_navig_filter_flags_exclude.filter(i => i !== e.currentTarget.m_name);
+			u_NavigFiltersRefresh();
+		}
+	}
+	let elFlagsIn = st_SetElFlags({"flags":u_navig_filter_flags_include}, $('navig_filter_flags_include'), true);
+	for (let el of elFlagsIn)
+	{
+		el.title = "Double click to remove.";
+		el.ondblclick = function(e)
+		{
+			u_navig_filter_flags_include = u_navig_filter_flags_include.filter(i => i !== e.currentTarget.m_name);
+			u_NavigFiltersRefresh();
+		}
+	}
+
+	let elParent = g_elCurFolder.m_elParent;
+	if (elParent == null)
+		return;
+	let elFolders = elParent.m_elFolders;
+	if (elFolders == null)
+		return;
+
+	let flags_coll = [];
+	for (let elFolder of elFolders)
+	{
+		let fobject = elFolder.m_fobject;
+		if (fobject == null) continue;
+
+		let flags = [];
+		if (fobject.status && fobject.status.flags)
+			flags = fobject.status.flags;
+
+//		let toHide = false;
+		let toHide = (u_navig_filter_flags_include.length > 0);
+		for (let flag of flags)
+		{
+			if (u_navig_filter_flags_exclude.indexOf(flag) != -1)
+			{
+				toHide = true;
+				continue;
+			}
+
+			if (u_navig_filter_flags_include.indexOf(flag) != -1)
+			{
+				toHide = false;
+				continue;
+			}
+
+			if (flags_coll.indexOf(flag) == -1)
+				flags_coll.push(flag);
+		}
+
+		if (toHide && ASSET && (ASSET.type == 'shot'))
+			elFolder.style.display = 'none';
+		else
+			elFolder.style.display = 'block';
+	}
+
+	let elFlagsColl = $('navig_filter_flags_collected');
+
+	let elFlags = st_SetElFlags({"flags":flags_coll}, elFlagsColl, true);
+
+	for (let elFlag of elFlags)
+		elFlag.onclick = function(e){c_ElToggleSelected(e.currentTarget)};
+}
+function u_NavigFilterIncludeOnClick() {u_NavigFilterInExOnClick('include');}
+function u_NavigFilterExcludeOnClick() {u_NavigFilterInExOnClick('exclude');}
+function u_NavigFilterInExOnClick(i_inex)
+{
+	let elFlagsColl = $('navig_filter_flags_collected');
+	if (elFlagsColl.m_elFlags == null)
+		return;
+
+	let flags = [];
+	for (let el of elFlagsColl.m_elFlags)
+		if (el.m_selected && (flags.indexOf(el.m_name) == -1))
+			flags.push(el.m_name);
+
+	for (let flag of flags)
+		if (window['u_navig_filter_flags_'+i_inex].indexOf(flag) == -1)
+			window['u_navig_filter_flags_'+i_inex].push(flag);
+
+	u_NavigFiltersRefresh();
+}
+
+
 function u_DrawColorBars(i_args)
 {
 	var height = i_args.height;

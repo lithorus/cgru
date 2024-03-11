@@ -41,6 +41,7 @@ int readdata( int fd, char* data, int data_len, int buffer_maxlen)
 #else
 		int r = read( fd, data+bytes, buffer_maxlen-bytes);
 #endif
+//static int cycle = 0; if (++cycle > 12) return -1;
 		if( r < 0)
 		{
 			AFERRPE("readdata: read");
@@ -903,6 +904,28 @@ void af::rw_IntMap(std::map<std::string, int32_t> & io_map, Msg * io_msg)
 			rw_String(key, io_msg);
 			int32_t value;
 			rw_int32_t(value, io_msg);
+			io_map[key] = value;
+		}
+}
+
+void af::rw_LongMap(std::map<std::string, int64_t> & io_map, Msg * io_msg)
+{
+	uint32_t size = io_map.size();
+	rw_uint32_t(size, io_msg);
+
+	if (io_msg->isWriting())
+		for (std::map<std::string, int64_t>::iterator it = io_map.begin(); it != io_map.end(); it++)
+		{
+			w_String  ((*it).first,  io_msg);
+			rw_int64_t((*it).second, io_msg);
+		}
+	else
+		for (unsigned i = 0; i < size; i++)
+		{
+			std::string key;
+			rw_String(key, io_msg);
+			int64_t value;
+			rw_int64_t(value, io_msg);
 			io_map[key] = value;
 		}
 }

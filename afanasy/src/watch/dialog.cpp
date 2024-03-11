@@ -63,16 +63,19 @@ Dialog::Dialog():
 
 	QWidget * cw = new QWidget( this);
 	setCentralWidget( cw);
+	cw->setContentsMargins(0,0,0,0);
+	this->setContentsMargins(0,0,0,0);
 
     m_hlayout_a = new QHBoxLayout( cw);
     m_vlayout_a = new QVBoxLayout();
     m_hlayout_b = new QHBoxLayout();
     m_vlayout_b = new QVBoxLayout();
 
-    m_hlayout_a->setMargin ( 0);
-    m_vlayout_a->setMargin ( 0);
-    m_hlayout_b->setMargin ( 0);
-    m_vlayout_b->setMargin ( 0);
+	m_hlayout_a->setContentsMargins(0,0,0,0);
+	m_vlayout_a->setContentsMargins(0,0,0,0);
+	m_hlayout_b->setContentsMargins(0,0,0,0);
+	m_vlayout_b->setContentsMargins(0,0,0,0);
+
     m_hlayout_a->setSpacing( 0);
     m_vlayout_a->setSpacing( 0);
     m_hlayout_b->setSpacing( 0);
@@ -322,6 +325,20 @@ void Dialog::showMenuPrefs()
 	action = new QAction("Reset Windows Geometry", m_prefsMenu);
 	connect(action, SIGNAL(triggered()), this, SLOT(actResetWndRects()));
 	m_prefsMenu->addAction(action);
+
+	m_prefsMenu->addSeparator();
+
+    action = new QAction("Show Server Name", m_prefsMenu);
+    action->setCheckable(true);
+    action->setChecked(afqt::QEnvironment::showServerName.n != 0);
+    connect(action, SIGNAL(triggered()), this, SLOT(actShowServerName()));
+    m_prefsMenu->addAction(action);
+
+    action = new QAction("Show Server Port", m_prefsMenu);
+    action->setCheckable(true);
+    action->setChecked(afqt::QEnvironment::showServerPort.n != 0);
+    connect(action, SIGNAL(triggered()), this, SLOT(actShowServerPort()));
+    m_prefsMenu->addAction(action);
 
 	m_prefsMenu->addSeparator();
 
@@ -776,6 +793,8 @@ void Dialog::actSaveGUIOnExit()        {afqt::QEnvironment::saveGUIOnExit.n     
 void Dialog::actSaveHotkeysOnExit()    {afqt::QEnvironment::saveHotkeysOnExit.n  = 1 - afqt::QEnvironment::saveHotkeysOnExit.n; }
 void Dialog::actSaveWndRectsOnExit()   {afqt::QEnvironment::saveWndRectsOnExit.n = 1 - afqt::QEnvironment::saveWndRectsOnExit.n;}
 void Dialog::actResetWndRects()        {afqt::QEnvironment::resetAllRects();}
+void Dialog::actShowServerName()       {afqt::QEnvironment::showServerName.n     = 1 - afqt::QEnvironment::showServerName.n;    }
+void Dialog::actShowServerPort()       {afqt::QEnvironment::showServerPort.n     = 1 - afqt::QEnvironment::showServerPort.n;    }
 void Dialog::actShowOfflineNoise()     {afqt::QEnvironment::showOfflineNoise.n   = 1 - afqt::QEnvironment::showOfflineNoise.n;  }
 void Dialog::actShowDocs() {Watch::showDocs();}
 void Dialog::actShowForum(){Watch::showForum();}

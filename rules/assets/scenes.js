@@ -11,6 +11,8 @@ sc_thumb_params.skip_movies = {"width":'30%',"lwidth":'150px','type':"bool",'def
 sc_thumb_params_values = {};
 
 sc_area = false;
+sc_show_aux = false;
+sc_show_omit = false;
 
 if (ASSETS.scene && (ASSETS.scene.path == g_CurPath()))
 {
@@ -60,6 +62,28 @@ function sc_InitHTML( i_data)
 		}
 	}
 
+	let elBtnShowAux = document.createElement('div');
+	elBtnShowAux.textContent = 'Show Aux';
+	elBtnShowAux.classList.add('button');
+	$('asset_top_left').appendChild(elBtnShowAux);
+	elBtnShowAux.onclick = function(e){
+		let el = e.currentTarget;
+		c_ElToggleSelected(el);
+		sc_show_aux = el.m_selected;
+	}
+
+
+	let elBtnShowOmit = document.createElement('div');
+	elBtnShowOmit.textContent = 'Show Omit';
+	elBtnShowOmit.classList.add('button');
+	$('asset_top_left').appendChild(elBtnShowOmit);
+	elBtnShowOmit.onclick = function(e){
+		let el = e.currentTarget;
+		c_ElToggleSelected(el);
+		sc_show_omit = el.m_selected;
+	}
+
+
 	gui_Create( $('scenes_make_thumbnails'), sc_thumb_params);
 	gui_CreateChoices({"wnd":$('scenes_make_thumbnails'),"name":'colorspace',"value":RULES.thumbnail.colorspace,"label":'Colorspace:',"keys":RULES.dailies.colorspaces});
 
@@ -82,7 +106,24 @@ function sc_InitHTML( i_data)
 		}
 	}
 }
-
+function sc_AuxFolder(i_fobj)
+{
+	if (c_AuxFolder(i_fobj))
+	{
+		if (sc_show_aux)
+		{
+			if (i_fobj && i_fobj.status && i_fobj.status.flags && (i_fobj.status.flags.indexOf('aux') != -1))
+				return false;
+		}
+		if (sc_show_omit)
+		{
+			if (i_fobj && i_fobj.status && i_fobj.status.flags && (i_fobj.status.flags.indexOf('omit') != -1))
+				return false;
+		}
+		return true;
+	}
+	return false;
+}
 function sc_Create_Shot()
 {
 	let args = {};
@@ -145,7 +186,10 @@ function scene_Show()
 	var folders = g_elCurFolder.m_dir.folders;
 	for( var f = 0; f < folders.length; f++ )
 	{
-		if( c_AuxFolder( folders[f])) continue;
+		if (sc_AuxFolder(folders[f]))
+		{
+			continue;
+		}
 
 		var path = g_elCurFolder.m_path + '/' + folders[f].name;
 
@@ -240,18 +284,26 @@ function scene_Show()
 		elShot.appendChild( elSt.elFinish);
 
 		elShot.m_elStatus = document.createElement('div');
-		elShot.appendChild( elShot.m_elStatus);
+		elShot.appendChild(elShot.m_elStatus);
 		elShot.m_elStatus.classList.add('status');
 
+		elSt.elShow = document.createElement('div');
+		elShot.m_elStatus.appendChild(elSt.elShow);
+		elSt.elShow.classList.add('status_show');
+
+		elSt.elShowCompact = document.createElement('div');
+		elSt.elShowCompact.classList.add('status_show_compact');
+		elSt.elShow.appendChild(elSt.elShowCompact);
+
 		elSt.elProgress = document.createElement('div');
-		elShot.m_elStatus.appendChild( elSt.elProgress);
+		elSt.elShowCompact.appendChild(elSt.elProgress);
 		elSt.elProgress.classList.add('progress');
 		elSt.elProgressBar = document.createElement('div');
 		elSt.elProgress.appendChild( elSt.elProgressBar);
 		elSt.elProgressBar.classList.add('progressbar');
 
-		var elEditBtn = document.createElement('div');
-		elShot.m_elStatus.appendChild( elEditBtn);
+		let elEditBtn = document.createElement('div');
+		elSt.elShowCompact.appendChild( elEditBtn);
 		elEditBtn.classList.add('button');
 		elEditBtn.classList.add('edit');
 		elEditBtn.title = 'Edit status.\nSelect several shots to edit.';
@@ -259,42 +311,48 @@ function scene_Show()
 			elEditBtn.style.display = 'none';
 
 		elSt.elPercentage = document.createElement('div');
-		elShot.m_elStatus.appendChild( elSt.elPercentage);
+		elSt.elShowCompact.appendChild(elSt.elPercentage);
 		elSt.elPercentage.classList.add('percent');
 
 		elSt.elAnnotation = document.createElement('div');
-		elShot.m_elStatus.appendChild( elSt.elAnnotation);
+		elSt.elShowCompact.appendChild(elSt.elAnnotation);
 		elSt.elAnnotation.classList.add('annotation');
 
 		elSt.elFlags = document.createElement('div');
-		elShot.m_elStatus.appendChild( elSt.elFlags);
+		elSt.elShowCompact.appendChild(elSt.elFlags);
 		elSt.elFlags.classList.add('flags');
 
-		elSt.elTasks = document.createElement('div');
-		elShot.m_elStatus.appendChild( elSt.elTasks);
-		elSt.elTasks.classList.add('tags');
+		elSt.elTasksBadges = document.createElement('div');
+		elSt.elShowCompact.appendChild(elSt.elTasksBadges);
+		elSt.elTasksBadges.classList.add('tasks_badges');
 
 		elSt.elTags = document.createElement('div');
-		elShot.m_elStatus.appendChild( elSt.elTags);
+		elSt.elShowCompact.appendChild( elSt.elTags);
 		elSt.elTags.classList.add('tags');
 
 		elSt.elArtists = document.createElement('div');
-		elShot.m_elStatus.appendChild( elSt.elArtists);
+		elSt.elShowCompact.appendChild(elSt.elArtists);
 		elSt.elArtists.classList.add('artists');
 
-		function st_CreateSceneShot( i_status)
+		elSt.elTasks = document.createElement('div');
+		elSt.elShow.appendChild(elSt.elTasks);
+		elSt.elTasks.classList.add('tasks');
+		elSt.elTasks.onclick = function(e){e.stopPropagation();return false;}
+
+		function sc_CreateSceneShot(i_status)
 		{
-			for( var el in elSt ) i_status[el] = elSt[el];
+			for (let el in elSt)
+				i_status[el] = elSt[el];
+
 			i_status.elColor = elShot;
 			i_status.elParent = elShot;
-			i_status.elShow = elShot.m_elStatus;
 		}
 
-		if( folders[f].status && folders[f].status.flags )
-			for( var fl = 0; fl < folders[f].status.flags.length; fl++)
-				elShot.classList.add( folders[f].status.flags[fl]);
+		if (folders[f].status && folders[f].status.flags)
+			for(let fl = 0; fl < folders[f].status.flags.length; fl++)
+				elShot.classList.add(folders[f].status.flags[fl]);
 
-		var st_obj = new Status( folders[f].status, {"path":path,"createGUI": st_CreateSceneShot,'tasks_badges':true});
+		let st_obj = new Status( folders[f].status, {"path":path,"createGUI": sc_CreateSceneShot,'multi':true,'tasks_badges':true});
 		elShot.m_status = st_obj;
         st_Statuses[path] = st_obj;
 		elEditBtn.m_status = st_obj;
@@ -351,7 +409,8 @@ function scenes_Received( i_data, i_args)
 	for( var sc = 0; sc < walk.folders.length; sc++)
 	{
 		var fobj = walk.folders[sc];
-		if( c_AuxFolder( fobj)) continue;
+		if (sc_AuxFolder(fobj))
+			continue;
 
 		var elScene = document.createElement('div');
 		sc_elScenes.push( elScene);
@@ -381,7 +440,8 @@ function scenes_Received( i_data, i_args)
 		for( var s = 0; s < walk.folders[sc].folders.length; s++)
 		{
 			var fobj = walk.folders[sc].folders[s];
-			if( c_AuxFolder( fobj)) continue;
+			if (sc_AuxFolder(fobj))
+				continue;
 
 			var elShot = document.createElement('div');
 			sc_elShots.push( elShot);
@@ -402,64 +462,64 @@ function scenes_Received( i_data, i_args)
 
 			var elSt = {};
 
-			elShot.m_elStatus = document.createElement('div');
-			elShot.appendChild( elShot.m_elStatus);
-			elShot.m_elStatus.classList.add('status');
+			elSt.elShow = document.createElement('div');
+			elShot.appendChild( elSt.elShow);
+			elSt.elShow.classList.add('status','status_show','status_show_compact');
 
 			elSt.elAnnotation = document.createElement('div');
-			elShot.m_elStatus.appendChild( elSt.elAnnotation);
+			elSt.elShow.appendChild( elSt.elAnnotation);
 			elSt.elAnnotation.classList.add('annotation');
 
 			elSt.elPercentage = document.createElement('div');
-			elShot.m_elStatus.appendChild( elSt.elPercentage);
+			elSt.elShow.appendChild( elSt.elPercentage);
 			elSt.elPercentage.classList.add('percent');
 
 			var elName = document.createElement('a');
-			elShot.m_elStatus.appendChild( elName);
+			elSt.elShow.appendChild( elName);
 			elName.classList.add('name');
 			elName.textContent = fobj.name;
 			elName.href = '#'+elShot.m_path;
 
 			elSt.elProgress = document.createElement('div');
-			elShot.m_elStatus.appendChild( elSt.elProgress);
+			elSt.elShow.appendChild( elSt.elProgress);
 			elSt.elProgress.classList.add('progress');
 			elSt.elProgressBar = document.createElement('div');
 			elSt.elProgress.appendChild( elSt.elProgressBar);
 			elSt.elProgressBar.classList.add('progressbar');
 
 			elSt.elFlags = document.createElement('div');
-			elShot.m_elStatus.appendChild( elSt.elFlags);
+			elSt.elShow.appendChild( elSt.elFlags);
 			elSt.elFlags.classList.add('flags');
 
-			elSt.elTasks = document.createElement('div');
-			elShot.m_elStatus.appendChild(elSt.elTasks);
-			elSt.elTasks.classList.add('tasks');
+			elSt.elTasksBadges = document.createElement('div');
+			elSt.elShow.appendChild(elSt.elTasksBadges);
+			elSt.elTasksBadges.classList.add('tasks_badges');
 
 			elSt.elTags = document.createElement('div');
-			elShot.m_elStatus.appendChild( elSt.elTags);
+			elSt.elShow.appendChild( elSt.elTags);
 			elSt.elTags.classList.add('tags');
 
 			elSt.elArtists = document.createElement('div');
-			elShot.m_elStatus.appendChild( elSt.elArtists);
+			elSt.elShow.appendChild( elSt.elArtists);
 			elSt.elArtists.classList.add('artists');
 
 /*			elSt.elFinish = document.createElement('div');
-			elShot.m_elStatus.appendChild( elSt.elFinish);
+			elSt.elShow.appendChild( elSt.elFinish);
 			elSt.elFinish.classList.add('finish');*/
 
-			function st_CreateSceneShot( i_status)
+			function sc_CreateAreaShot( i_status)
 			{
 				for( var el in elSt ) i_status[el] = elSt[el];
 				i_status.elParent = elShot;
 				i_status.elColor = elShot;
-				i_status.elShow = elShot.m_elStatus;
+				i_status.elShow = elSt.elShow;
 			}
 
 			if( fobj.status && fobj.status.flags )
 				for( var f = 0; f < fobj.status.flags.length; f++)
 					elShot.classList.add( fobj.status.flags[f]);
 
-			let st_obj = new Status(fobj.status, {"path":elShot.m_path,"createGUI": st_CreateSceneShot,"display_short":true,'tasks_badges':true});
+			let st_obj = new Status(fobj.status, {"path":elShot.m_path,"createGUI": sc_CreateAreaShot,"display_short":true,'tasks_badges':true});
 			elShot.m_status = st_obj;
             st_Statuses[elShot.m_path] = st_obj;
 
@@ -486,6 +546,39 @@ function sc_EditStatus( e)
 	status.edit({"statuses":statuses});
 
 	return false;
+}
+
+function sc_EditTask(e)
+{
+	e.stopPropagation();
+
+	let task = e.currentTarget.m_task;
+	let shots = scenes_GetSelectedShots();
+	let paths = [task.statusClass.path];
+	for (let shot of shots)
+	{
+		let path = shot.m_status.path;
+		if (false == paths.includes(path))
+			paths.push(path);
+	}
+
+	task.edit({"paths":paths});
+
+	return false;
+}
+
+function sc_AddTask(i_status)
+{
+	let shots = scenes_GetSelectedShots();
+	let paths = [i_status.path];
+	for (let shot of shots)
+	{
+		let path = shot.m_status.path;
+		if (false == paths.includes(path))
+			paths.push(path);
+	}
+
+	new Task(i_status, /* task = */null/* as it is a new task*/,{"paths":paths});
 }
 
 function sc_EditBody( i_e)

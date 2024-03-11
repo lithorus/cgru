@@ -391,11 +391,15 @@ void ItemRender::v_updateValues(af::Node * i_afnode, int i_msgType)
 	    m_hres.copy( render->getHostRes());
 		m_idle_time = render->getIdleTime();
 		m_busy_time = render->getBusyTime();
+		m_hw_info = afqt::stoq(m_hres.hw_info);
 
 	    int mem_used = m_hres.mem_total_mb - m_hres.mem_free_mb;
 	    int hdd_used = m_hres.hdd_total_gb - m_hres.hdd_free_gb;
 
-		m_plotCpu.setLabel(QString("C %1*%2").arg(m_hres.cpu_num).arg(double(m_hres.cpu_mhz) / 1000.0, 0, 'f', 1));
+		QString cpu_label = QString("C %1*%2").arg(m_hres.cpu_num).arg(double(m_hres.cpu_mhz) / 1000.0, 0, 'f', 1);
+		if ((m_hres.cpu_temp > 0) && notVirtual())
+			cpu_label = QString("%1 %2C").arg(cpu_label).arg(m_hres.cpu_temp);
+		m_plotCpu.setLabel(cpu_label);
 	    m_plotCpu.addValue( 0, m_hres.cpu_system + m_hres.cpu_iowait + m_hres.cpu_irq + m_hres.cpu_softirq);
 	    m_plotCpu.addValue( 1, m_hres.cpu_user + m_hres.cpu_nice);
 
@@ -483,7 +487,8 @@ void ItemRender::v_updateValues(af::Node * i_afnode, int i_msgType)
 	    m_update_counter++;
 
 		m_info_text_hres.clear();
-		m_info_text_hres += QString("CPU: <b>%1</b> x<b>%2</b> MHz").arg(m_hres.cpu_mhz).arg(m_hres.cpu_num);
+		m_info_text_hres += QString("<br>%1").arg(m_hw_info);
+		m_info_text_hres += QString("<br>CPU: <b>%1</b>x<b>%2</b> MHz <b>%3</b>C").arg(m_hres.cpu_mhz).arg(m_hres.cpu_num).arg(m_hres.cpu_temp);
 		m_info_text_hres += QString("<br>MEM: <b>%1</b> GB").arg(m_hres.mem_total_mb>>10);
 		if( m_hres.swap_total_mb )
 			m_info_text_hres += QString(" Swap: <b>%1</b> GB").arg(m_hres.swap_total_mb>>10);
@@ -589,12 +594,74 @@ void ItemRender::v_paint(QPainter * i_painter, const QRect & i_rect, const QStyl
 	else if (m_nimby ) itemColor = &(afqt::QEnvironment::clr_itemrendernimby.c);
 	else if (m_busy  ) itemColor = &(afqt::QEnvironment::clr_itemrenderbusy.c);
 
+	int clr[3] = {itemColor->red(), itemColor->green(), itemColor->blue()};
+	if ((m_hres.cpu_temp > 0) && notVirtual())
+	{
+		// Hot CPU temperature makes background color red:
+		int tmin = af::Environment::getMonitorRenderCPUHotMin();
+		int tmax = af::Environment::getMonitorRenderCPUHotMax();
+		int c_hot[3] = {255, 0, 0};
+		float factor = float(m_hres.cpu_temp - tmin) / float(tmax - tmin);
+		if (factor < 0.0) factor = 0.0;
+		if (factor > 1.0) factor = 1.0;
+		factor = 0.3 * (factor * factor);
+		for (int i = 0; i < 3; i++)
+			clr[i] = int((1.0 - factor) * clr[i] + factor * c_hot[i]);
+	}
+	QColor color = QColor(clr[0], clr[1], clr[2]);
+
 	// Draw standart backgroud
-	drawBack(i_painter, i_rect, i_option, itemColor, m_dirty ? &(afqt::QEnvironment::clr_error.c) : NULL);
+	drawBack(i_painter, i_rect, i_option, &color, m_dirty ? &(afqt::QEnvironment::clr_error.c) : NULL);
 
 	QString offlineState_time = m_offlineState;
 	if (m_wol_operation_time > 0)
 	    offlineState_time = m_offlineState + " " + afqt::stoq(af::time2strHMS(time(NULL) - m_wol_operation_time ));
+
+	// Draw CPU Temperature bar:
+	if (m_online && (m_hres.cpu_temp > 0) && notVirtual())
+	{
+		int width = w/7;
+		static const int height = 3;
+		int posx = x + 24;
+		int posy = y + 13;
+
+		int barw = m_hres.cpu_temp * width / 100;
+		if (barw > width) barw = width;
+		static const int clr_cold[3] = {  70,  70, 110};
+		static const int clr_warm[3] = { 180, 140,  90};
+		static const int clr_hot [3] = { 255,   0,   0};
+		int clr[3] = {0,0,0};
+		int tcold = 50;
+		int twarm = af::Environment::getMonitorRenderCPUHotMin();
+		int thot  = af::Environment::getMonitorRenderCPUHotMax();
+		if (m_hres.cpu_temp > twarm)
+		{
+			float factor = float(m_hres.cpu_temp - twarm) / float(thot - twarm);
+			if (factor > 1.0) factor = 1.0;
+			for (int i = 0; i < 3; i++)
+				clr[i] = (1.0 - factor) * clr_warm[i] + factor * clr_hot[i];
+		}
+		else if (m_hres.cpu_temp > tcold)
+		{
+			float factor = float(m_hres.cpu_temp - tcold) / float(twarm - tcold);
+			if (factor > 1.0) factor = 1.0;
+			for (int i = 0; i < 3; i++)
+				clr[i] = (1.0 - factor) * clr_cold[i] + factor * clr_warm[i];
+		}
+		else
+		{
+			for (int i = 0; i < 3; i++)
+				clr[i] = clr_cold[i];
+		}
+
+		i_painter->setBrush(QBrush(QColor(clr[0], clr[1], clr[2]), Qt::SolidPattern));
+		i_painter->setPen(Qt::NoPen);
+		i_painter->drawRect(posx, posy, barw, height);
+
+		i_painter->setPen(afqt::QEnvironment::clr_outline.c);
+		i_painter->setBrush(Qt::NoBrush);
+		i_painter->drawRect(posx, posy, width, height);
+	}
 
 	// Draw busy/idle bar:
 	if (m_online && m_parent_pool)
@@ -607,7 +674,7 @@ void ItemRender::v_paint(QPainter * i_painter, const QRect & i_rect, const QStyl
 		long long curtime = time(0);
 		int bar_secs = curtime - m_idle_time;
 		int busy_secs = curtime - m_busy_time;
-		int max = af::Environment::getWatchRenderIdleBarMax();
+		int max = af::Environment::getMonitorRenderIdleBarMax();
 		i_painter->setBrush(QBrush(afqt::QEnvironment::clr_itemrenderoff.c, Qt::SolidPattern));
 
 		if ((m_parent_pool->get_idle_free_time() > 0) && (isNimby() || isNIMBY()) && (false == isBusy()))
@@ -674,18 +741,28 @@ void ItemRender::v_paint(QPainter * i_painter, const QRect & i_rect, const QStyl
 		}
 	}
 
+	QRect rect;
+
 	// Paint offline render and exit.
 	if (false == m_online)
 	{
 		i_painter->setPen(  afqt::QEnvironment::qclr_black);
 		i_painter->setFont( afqt::QEnvironment::f_info);
-		i_painter->drawText(x+5, y_cur, w-10, HeightOffline, Qt::AlignVCenter | Qt::AlignRight, ann_state);
+		i_painter->drawText(x+5, y_cur, w-10, HeightOffline, Qt::AlignVCenter | Qt::AlignRight, ann_state, &rect);
 
+		i_painter->setFont( afqt::QEnvironment::f_thin);
+		i_painter->drawText(x+5, y_cur, w-10-rect.width()-10, HeightOffline, Qt::AlignVCenter | Qt::AlignRight, 'v' + m_engine);
+
+		i_painter->setFont( afqt::QEnvironment::f_info);
 		QRect rect_center;
 		i_painter->drawText(x+5, y_cur, w-10, HeightOffline,
 				Qt::AlignVCenter | Qt::AlignHCenter, offlineState_time, &rect_center);
 		i_painter->drawText(x+5, y_cur, (w>>1)-10-(rect_center.width()>>1), HeightOffline,
-				Qt::AlignVCenter | Qt::AlignLeft, m_name + ' ' + m_engine);
+				Qt::AlignVCenter | Qt::AlignLeft, m_name, &rect);
+
+		i_painter->setFont( afqt::QEnvironment::f_thin);
+		i_painter->drawText(x+5+rect.width()+10, y_cur, (w>>1)-10-(rect_center.width()>>1)-rect.width()-10, HeightOffline,
+				Qt::AlignVCenter | Qt::AlignLeft, m_hw_info);
 
 		y_cur += HeightOffline;
 
@@ -716,26 +793,37 @@ void ItemRender::v_paint(QPainter * i_painter, const QRect & i_rect, const QStyl
 	case ListRenders::ESmallSize:
 		i_painter->setPen(clrTextInfo(i_option));
 		i_painter->setFont(afqt::QEnvironment::f_info);
-	    i_painter->drawText(left_text_x, y_cur, left_text_w, h, Qt::AlignTop | Qt::AlignLeft,
-				m_name + ' ' + m_capacity_usage + ' ' + m_loggedin_users + ' ' + m_engine);
+		i_painter->drawText(left_text_x, y_cur, left_text_w, h, Qt::AlignTop | Qt::AlignLeft, m_name, &rect);
+		i_painter->setFont(afqt::QEnvironment::f_thin);
+		i_painter->drawText(left_text_x + rect.width()+5, y_cur-1, left_text_w, h, Qt::AlignTop | Qt::AlignLeft,
+				m_capacity_usage + ' ' + m_loggedin_users + ' ' + m_hw_info);
 
 		i_painter->setPen(clrTextInfo(i_option));
 		i_painter->setFont(afqt::QEnvironment::f_info);
-		i_painter->drawText(right_text_x, y_cur, right_text_w, h, Qt::AlignTop | Qt::AlignRight, ann_state);
+		i_painter->drawText(right_text_x, y_cur, right_text_w, h, Qt::AlignTop | Qt::AlignRight, ann_state, &rect);
+
+		i_painter->setFont(afqt::QEnvironment::f_thin);
+		i_painter->drawText(right_text_x, y_cur+1, right_text_w-rect.width()-5, h, Qt::AlignTop | Qt::AlignRight, 'v' + m_engine);
 
 		break;
 	default:
 		i_painter->setPen(clrTextMain(i_option));
 		i_painter->setFont(afqt::QEnvironment::f_name);
-	    i_painter->drawText(left_text_x, y_cur, left_text_w, h, Qt::AlignTop | Qt::AlignLeft, m_name + ' ' + m_engine);
+		i_painter->drawText(left_text_x, y_cur, left_text_w, h, Qt::AlignTop | Qt::AlignLeft, m_name, &rect);
+
+		i_painter->setFont(afqt::QEnvironment::f_thin);
+		i_painter->drawText(left_text_x + rect.width()+5, y_cur, left_text_w, h, Qt::AlignTop | Qt::AlignLeft, m_hw_info);
 
 		i_painter->setPen(afqt::QEnvironment::qclr_black );
 		i_painter->setFont(afqt::QEnvironment::f_info);
-		i_painter->drawText(right_text_x, y_cur+2, right_text_w, h, Qt::AlignTop | Qt::AlignRight, ann_state );
+		i_painter->drawText(right_text_x, y_cur+1, right_text_w, h, Qt::AlignTop | Qt::AlignRight, ann_state, &rect);
+
+		i_painter->setFont(afqt::QEnvironment::f_thin);
+		i_painter->drawText(right_text_x, y_cur, right_text_w-rect.width()-5, h, Qt::AlignTop | Qt::AlignRight, 'v' + m_engine);
 
 		i_painter->setPen(clrTextInfo(i_option));
 		i_painter->setFont(afqt::QEnvironment::f_info);
-	    i_painter->drawText(left_text_x,  y_cur, left_text_w,  base_height+2, Qt::AlignBottom | Qt::AlignLeft,  m_capacity_usage + ' ' + m_loggedin_users);
+		i_painter->drawText(left_text_x,  y_cur, left_text_w,  base_height+2, Qt::AlignBottom | Qt::AlignLeft,  m_capacity_usage + ' ' + m_loggedin_users);
 	}
 	
 	// Print Bottom|Right
@@ -943,7 +1031,7 @@ void ItemRender::drawTask(QPainter * i_painter, const QStyleOptionViewItem & i_o
 	QPen pen(clrTextInfo(i_option));
 
 	// Draw tickets
-	for (auto const & tIt : i_exec->m_tickets)
+	for (auto const & tIt : i_exec->getTickets())
 	{
 		tw += Item::drawTicket(i_painter, pen, i_x+5 + tw, i_y+1, i_w-5 - tw, Item::HeightTickets - 5,
 				Item::TKD_LEFT,
@@ -1004,6 +1092,9 @@ void ItemRender::v_setSortType( int i_type1, int i_type2 )
 		case CtrlSortFilter::TENGINE:
 	        m_sort_str1 = m_engine;
 			break;
+		case CtrlSortFilter::THWINFO:
+	        m_sort_str1 = m_hw_info;
+			break;
 		case CtrlSortFilter::TADDRESS:
 	        m_sort_str1 = m_address_str;
 			break;
@@ -1042,6 +1133,9 @@ void ItemRender::v_setSortType( int i_type1, int i_type2 )
 		case CtrlSortFilter::TENGINE:
 	        m_sort_str2 = m_engine;
 			break;
+		case CtrlSortFilter::THWINFO:
+	        m_sort_str2 = m_hw_info;
+			break;
 		case CtrlSortFilter::TADDRESS:
 	        m_sort_str2 = m_address_str;
 			break;
@@ -1069,6 +1163,9 @@ void ItemRender::v_setFilterType( int i_type )
 			break;
 		case CtrlSortFilter::TENGINE:
 	        m_filter_str = afqt::qtos( m_engine);
+			break;
+		case CtrlSortFilter::THWINFO:
+	        m_filter_str = afqt::qtos(m_hw_info);
 			break;
 		case CtrlSortFilter::TADDRESS:
 	        m_filter_str = afqt::qtos( m_address_str);

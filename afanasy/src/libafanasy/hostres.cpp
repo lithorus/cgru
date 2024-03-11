@@ -69,6 +69,7 @@ void HostResCustom::v_generateInfoStream(std::ostringstream & stream, bool full)
 HostRes::HostRes():
     cpu_num(0),
     cpu_mhz(0),
+	cpu_temp(0),
 
     cpu_user(0),
     cpu_nice(0),
@@ -114,6 +115,7 @@ void HostRes::copy( const HostRes & other)
 
     cpu_num  = other.cpu_num;
     cpu_mhz  = other.cpu_mhz;
+    cpu_temp = other.cpu_temp;
 
     cpu_user         = other.cpu_user;
     cpu_nice         = other.cpu_nice;
@@ -142,6 +144,7 @@ void HostRes::copy( const HostRes & other)
 	gpu_mem_used_mb  = other.gpu_mem_used_mb;
 	gpu_string       = other.gpu_string;
 
+	hw_info          = other.hw_info;
     logged_in_users  = other.logged_in_users;
 
     if( custom.size() != other.custom.size())
@@ -163,6 +166,7 @@ void HostRes::jsonWrite( std::ostringstream & o_str) const
 
 	o_str << "\n\"cpu_num\":"  << cpu_num;
 	o_str << ",\n\"cpu_mhz\":" << cpu_mhz;
+	o_str << ",\n\"cpu_temp\":" << cpu_temp;
 	o_str << ",\n\"cpu_loadavg\":[" << int(cpu_loadavg[0])<<','<< int(cpu_loadavg[1])<<','<< int(cpu_loadavg[2])<<']';
 	o_str << ",\n\"cpu_user\":"    << int(cpu_user);
 	o_str << ",\n\"cpu_nice\":"    << int(cpu_nice);
@@ -191,6 +195,8 @@ void HostRes::jsonWrite( std::ostringstream & o_str) const
 	o_str << ",\n\"gpu_mem_total_mb\":" << gpu_mem_total_mb;
 	o_str << ",\n\"gpu_mem_used_mb\":"  << gpu_mem_used_mb;
 	o_str << ",\n\"gpu_string\":\""     << gpu_string << "\"";
+
+	o_str << ",\n\"hw_info\":\"" << hw_info << "\"";
 
 	if( logged_in_users.size())
 	{
@@ -224,6 +230,7 @@ void HostRes::v_readwrite( Msg * msg)
 {
     rw_int32_t( cpu_num,      msg);
     rw_int32_t( cpu_mhz,      msg);
+	rw_int32_t( cpu_temp,      msg);
     rw_uint8_t( cpu_loadavg[0],     msg);
     rw_uint8_t( cpu_loadavg[1],     msg);
     rw_uint8_t( cpu_loadavg[2],     msg);
@@ -256,6 +263,8 @@ void HostRes::v_readwrite( Msg * msg)
 
     rw_StringVect( logged_in_users, msg);
 
+	rw_String (hw_info, msg);
+
     uint8_t custom_count = uint8_t(custom.size());
 
     if( msg->isReading())
@@ -273,10 +282,10 @@ void HostRes::v_readwrite( Msg * msg)
 
 void HostRes::v_generateInfoStream( std::ostringstream & stream, bool full) const
 {
-    stream << "\nResources: ";
+    stream << "\nResources: " << hw_info;
     if( full)
     {
-        stream << "\n   CPU = " << cpu_mhz << " MHz x" << cpu_num;
+        stream << "\n   CPU = " << cpu_mhz << "MHz x" << cpu_num << ", Temperature: " << cpu_temp << "C";
         stream << "\n      "
             << int( cpu_user    ) << "% usr, "
             << int( cpu_nice    ) << "% nice, "
@@ -317,7 +326,7 @@ void HostRes::v_generateInfoStream( std::ostringstream & stream, bool full) cons
     else
     {
         stream << "la[" << cpu_loadavg[0]/10.0 << "," << cpu_loadavg[1]/10.0 << "," << cpu_loadavg[2]/10.0 << "]";
-        stream << "; C" << cpu_mhz << "x" << cpu_num
+        stream << "; C" << cpu_mhz << "x" << cpu_num << " " << int(cpu_temp) << "C"
             << " u" << int(cpu_user)    << "%"
             << " n" << int(cpu_nice)    << "%"
             << " s" << int(cpu_system)  << "%"

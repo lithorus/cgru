@@ -308,7 +308,7 @@ function bm_Show()
 				bm_elements.push(el);
 				scene.el.appendChild(el);
 
-				if (bm.status.flags)
+				if (bm.status && bm.status.flags)
 				{
 					for (let flag of bm.status.flags)
 					{
@@ -319,7 +319,7 @@ function bm_Show()
 					}
 				}
 
-				if (bm.status.tasks)
+				if (bm.status && bm.status.tasks)
 				{
 					for (let task in bm.status.tasks)
 					{
@@ -334,6 +334,10 @@ function bm_Show()
 						{
 							for (let flag of task.flags)
 							{
+								// Skip task if the flag was already added at status:
+								if (bm.status.flags && bm.status.flags.includes(flag))
+									continue;
+
 								if (flag in prj_flags)
 									prj_flags[flag] += 1;
 								else
@@ -382,6 +386,7 @@ function bm_Show()
 
 	bm_HighlightCurrent();
 	bm_ThumbnailsShowHide();
+	activity_ApplyFilter();
 
 	bm_DeleteObsoleteForTime();
 }
@@ -415,6 +420,19 @@ function bm_CreateBookmark(i_bm)
 	elPath.textContent = name;
 	elPath.href = '#' + i_bm.path;
 	elPath.onclick = function(e){bm_clicked = true};
+
+	el.m_elThumb_div = document.createElement('div');
+	el.appendChild(el.m_elThumb_div);
+	el.m_elThumb_div.classList.add('thumb_div','activity_filter');
+	el.m_elThumb_div.m_tags = [];
+	if (i_bm.status && i_bm.status.tasks)
+		for (let t in i_bm.status.tasks)
+		{
+			let task = i_bm.status.tasks[t];
+			if (task.artists && (task.artists.indexOf(g_auth_user.id) != -1))
+				if (task.tags) for (let tag of task.tags)
+					el.m_elThumb_div.m_tags.push(tag);
+		}
 
 	// Display status:
 	st_SetElStatus(el, i_bm.status, /*show all tasks = */ false);
@@ -723,24 +741,25 @@ function bm_ThumbnailsShow()
 {
 	c_ElSetSelected($('bookmarks_thumbs_btn'), true);
 
-	for (var i = 0; i < bm_elements.length; i++)
+	for (let i = 0; i < bm_elements.length; i++)
 	{
-		var el = bm_elements[i];
+		let el = bm_elements[i];
 
-		if (el.m_elTh == null)
+		if (el.m_elThumb == null)
 		{
-			el.m_elTh = document.createElement('a');
-			el.appendChild(el.m_elTh);
-			el.m_elTh.href = '#' + el.m_bookmark.path;
+			el.m_elThumb = document.createElement('a');
+			el.m_elThumb_div.appendChild(el.m_elThumb);
+			el.m_elThumb.href = '#' + el.m_bookmark.path;
 
-			var img = document.createElement('img');
-			el.m_elTh.appendChild(img);
+			let img = document.createElement('img');
+			el.m_elThumb.appendChild(img);
 			img.src = RULES.root + el.m_bookmark.path + '/' + RUFOLDER + '/thumbnail.jpg';
 			img.style.display = 'none';
 			img.onload = function(i_el) { i_el.currentTarget.style.display = 'block'; }
 		}
 
-		el.m_elTh.style.display = 'block';
+		el.m_elThumb.style.display = 'block';
+		el.classList.add('with_thumb');
 	}
 }
 
@@ -748,10 +767,11 @@ function bm_ThumbnailsHide()
 {
 	c_ElSetSelected($('bookmarks_thumbs_btn'), false);
 
-	for (var i = 0; i < bm_elements.length; i++)
+	for (let i = 0; i < bm_elements.length; i++)
 	{
-		var el = bm_elements[i];
-		if (el.m_elTh)
-			el.m_elTh.style.display = 'none';
+		let el = bm_elements[i];
+		if (el.m_elThumb)
+			el.m_elThumb.style.display = 'none';
+		el.classList.remove('with_thumb');
 	}
 }

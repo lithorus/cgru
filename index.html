@@ -54,7 +54,7 @@ if( document.location.host.indexOf('rules.cgru.info') != -1 )
 <div id="navig_div">
 	<div id="navig"></div>
 	<div id="navig_loading" oncontextmenu="return false"></div>
-	<div id="navig_panel">
+	<div id="navig_panel" class="navig_buttons">
 		<div class="infotooltip" style="float: left; margin: 1px 4px;" title="Navigation Controls:
 LMB - go to folder (set current)
 LMB on the current folder - open/close
@@ -64,21 +64,37 @@ Use [ART],[TAG],[ANN] buttons
 to show/hide folder status info."
 			></div>
 		<div class="button" style="width:16px;" title="Scroll to current" onclick="g_NavigScrollCurrent()">&gt;&lt;</div>
-		<div class="button" id="navig_show_thumbs"     title="Show thumbnails" onclick="g_NavigShowInfo(this)">TMB</div>
+		<div class="button" style="width:16px;" title="Open settings" onclick="u_NavigSettingsOnClick()">vʌ</div>
 		<div class="button" id="navig_show_tasks"      title="Show tasks"      onclick="g_NavigShowInfo(this)">TSK</div>
 		<div class="button" id="navig_show_tasks_only_my" title="Show only my tasks" onclick="g_NavigShowInfo(this)">MYT</div>
-		<div class="button" id="navig_show_flags"      title="Show flags"      onclick="g_NavigShowInfo(this)">FLG</div>
-		<div class="button" id="navig_show_artists"    title="Show artists"    onclick="g_NavigShowInfo(this)">ART</div>
-		<div class="button" id="navig_show_tags"       title="Show tags"       onclick="g_NavigShowInfo(this)">TAG</div>
 		<div class="button" id="navig_show_annotation" title="Show annotation" onclick="g_NavigShowInfo(this)">ANN</div>
 		<div class="button small" id="navig_show_frames"     title="Show frames number
 Only if it was calculated" onclick="g_NavigShowInfo(this)">F</div>
-		<div class="button" id="navig_show_size"       title="Show size
-Only if it was calculated
-Refresh browser to sort by size" onclick="g_NavigShowInfo(this)">SIZE</div>
-		<div class="button small" id="navig_show_duration"   title="Show duration" onclick="g_NavigShowInfo(this)">D</div>
-		<div class="button small" id="navig_show_price"      title="Show price" onclick="g_NavigShowInfo(this)">P</div>
 		<div class="button small" id="navig_show_percent"    title="Show percentage"    onclick="g_NavigShowInfo(this)">%</div>
+	</div>
+	<div id="navig_settings" style="display: none;">
+		<div class="navig_buttons">
+			<div class="button" id="navig_show_thumbs"     title="Show thumbnails" onclick="g_NavigShowInfo(this)">TMB</div>
+			<div class="button" id="navig_show_flags"      title="Show flags"      onclick="g_NavigShowInfo(this)">FLG</div>
+			<div class="button" id="navig_show_artists"    title="Show artists"    onclick="g_NavigShowInfo(this)">ART</div>
+			<div class="button" id="navig_show_tags"       title="Show tags"       onclick="g_NavigShowInfo(this)">TAG</div>
+			<div class="button" id="navig_show_size"       title="Show size
+	Only if it was calculated
+	Refresh browser to sort by size" onclick="g_NavigShowInfo(this)">SIZE</div>
+			<div class="button small" id="navig_show_duration"   title="Show duration" onclick="g_NavigShowInfo(this)">D</div>
+			<div class="button small" id="navig_show_price"      title="Show price" onclick="g_NavigShowInfo(this)">P</div>
+		</div>
+		<div id="navig_filters">
+			<div class="navig_filter">
+				<div class="button" onclick="u_NavigFilterIncludeOnClick()">IN</div>
+				<div id="navig_filter_flags_include"></div>
+			</div>
+			<div class="navig_filter">
+				<div class="button" onclick="u_NavigFilterExcludeOnClick()">EX</div>
+				<div id="navig_filter_flags_exclude"></div>
+			</div>
+			<div id="navig_filter_flags_collected"></div>
+		</div>
 	</div>
 	<div id="navig_handle" class="gui_size_handle" onmousedown="u_ResizeGUIStart('navig_width',1)"></div>
 </div>
@@ -196,7 +212,7 @@ Refresh browser to sort by size" onclick="g_NavigShowInfo(this)">SIZE</div>
 		</div>
 	</div>
 	<div style="text-align:center; clear: both;"><img id="thumbnail" class="thumbnail" style="margin-top:4px"></div>
-	<div id="status">
+	<div id="status" class="status">
 		<div id="status_show">
 			<div class="infotooltip" style="float: left;" title="Info:
 This is current location (folder,shot,project) status.
@@ -225,7 +241,7 @@ Supervisor can assign artist by creating a task."
 					<div id="status_tasks_btn_add_artist" class="button" onclick="task_AddArtistTask()" style="display:none">Add Artist Task</div>
 				</div>
 				<div id="status_tasks_label">Tasks:</div>
-				<div id="status_tasks"></div>
+				<div id="status_tasks" class="tasks"></div>
 			</div>
 			<div style="clear:both;">
 				<div id="status_reports_div" style="display: none;">
@@ -353,6 +369,7 @@ Comment can be an artist report with a tag and duration.
 			<div id="comments" class="view_view"></div>
 		</div>
 	</div>
+	<div id="location_info"></div>
 </div>
 
 <div id="sidepanel_div">
@@ -587,7 +604,11 @@ Link with hidden folder will not works.">
 			</div>
 			<div class="cgru_parameter">
 				<div class="label">Hide ScrollBars:</div>
-				<div class="variable button" id="hide_scrollbars" onclick="u_CalcGUI(true)">unknown</div>
+				<div class="variable button" id="hide_scrollbars">obsolete</div>
+			</div>
+			<div class="cgru_parameter" title="Refresh required.">
+				<div class="label">Sort Aux Bottom:</div>
+				<div class="variable button" id="sort_aux_bottom"onclick="g_SortAuxBottom()">unknown</div>
 			</div>
 			<div class="cgru_parameter" title="Refresh required.">
 				<div class="label">Has Filesystem:</div>
