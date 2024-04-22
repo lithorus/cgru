@@ -37,9 +37,7 @@ public:
 
 	virtual void v_refresh( time_t currentTime, RenderContainer * renders, MonitorContainer * monitoring, int & errorHostId);
 
-	void restart( const std::string & i_message, RenderContainer * i_renders, MonitorContainer * i_monitoring, uint32_t i_state = 0);
-
-	void skip(const std::string & i_message, RenderContainer * i_renders, MonitorContainer * i_monitoring, uint32_t i_state);
+	void operation(const std::string & i_message, RenderContainer * i_renders, MonitorContainer * i_monitoring, uint32_t i_with_state, uint32_t i_set_state);
 
 	bool tryNext(bool i_enable, MonitorContainer * i_monitoring);
 

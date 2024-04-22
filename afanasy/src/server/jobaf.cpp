@@ -124,6 +124,8 @@ void JobAf::readStore()
 
 void JobAf::initializeValues()
 {
+	m_force_refresh    = true;
+
 	m_branch_srv       = NULL;
 	m_user             = NULL;
 	m_blocks           = NULL;
@@ -337,7 +339,15 @@ void JobAf::checkStates()
 		{
 			uint32_t taskstate = m_progress->tp[b][t]->state;
 
-			if ((taskstate == 0) || (taskstate == AFJOB::STATE_WARNING_MASK))
+			if (taskstate == 0)
+			{
+				// This is a new job, not from database
+				if (m_blocks_data[b]->isSuspendingNewTasks())
+					taskstate = AFJOB::STATE_SUSPENDED_MASK;
+				else
+					taskstate = AFJOB::STATE_READY_MASK;
+			}
+			else if (taskstate == AFJOB::STATE_WARNING_MASK)
 			{
 				taskstate = AFJOB::STATE_READY_MASK;
 			}
@@ -369,7 +379,10 @@ void JobAf::checkStatesOnAppend()
 
 			if( taskstate == 0 )
 			{
-				taskstate = AFJOB::STATE_READY_MASK;
+				if (m_blocks_data[b]->isSuspendingNewTasks())
+					taskstate = AFJOB::STATE_SUSPENDED_MASK;
+				else
+					taskstate = AFJOB::STATE_READY_MASK;
 				m_progress->tp[b][t]->state = taskstate;
 			}
 		}
@@ -508,6 +521,7 @@ void JobAf::v_action( Action & i_action)
 		if (job_changed)
 		{
 			i_action.monitors->addJobEvent( af::Monitor::EVT_jobs_change, getId(), getUid());
+			m_force_refresh = true;
 			store();
 		}
 
@@ -599,6 +613,7 @@ void JobAf::v_action( Action & i_action)
 		}
 		appendLog("Operation \"" + type + "\" by " + i_action.author);
 		i_action.monitors->addJobEvent( af::Monitor::EVT_jobs_change, getId(), getUid());
+		m_force_refresh = true;
 		store();
 		return;
 	}
@@ -661,6 +676,7 @@ void JobAf::v_action( Action & i_action)
 	{
 		// Not empty log means some parameter change:
 		store();
+		m_force_refresh = true;
 		i_action.monitors->addJobEvent( af::Monitor::EVT_jobs_change, getId(), getUid());
 	}
 }
@@ -1106,7 +1122,11 @@ void JobAf::v_refresh( time_t currentTime, AfContainer * pointer, MonitorContain
 	// No more calculations needed for a locked job:
 	if (isLocked())
 		return;
-	
+
+	// Skip DONE job refresh if it is not forced:
+	if (isDone() && (false == m_force_refresh))
+		return;
+
 	// for database and monitoring
 	uint32_t old_state = m_state;
 	uint32_t jobchanged = 0;
@@ -1153,7 +1173,7 @@ void JobAf::v_refresh( time_t currentTime, AfContainer * pointer, MonitorContain
 	{
 		_tasks_error += m_blocks[b]->m_data->getProgressTasksError();
 
-		if (m_blocks[b]->m_data->getState() && AFJOB::STATE_READY_MASK)
+		if (m_blocks[b]->m_data->getState() & AFJOB::STATE_READY_MASK)
 			_tasks_ready += m_blocks[b]->m_data->getProgressTasksReady();
 	}
 	// Compare changes
@@ -1169,6 +1189,7 @@ void JobAf::v_refresh( time_t currentTime, AfContainer * pointer, MonitorContain
 	m_state = m_state |   AFJOB::STATE_DONE_MASK;
 	m_state = m_state & (~AFJOB::STATE_RUNNING_MASK);
 	m_state = m_state & (~AFJOB::STATE_WARNING_MASK);
+	m_state = m_state & (~AFJOB::STATE_SUSPENDED_MASK);
 	m_state = m_state & (~AFJOB::STATE_ERROR_MASK);
 	m_state = m_state & (~AFJOB::STATE_READY_MASK);
 	m_state = m_state & (~AFJOB::STATE_SKIPPED_MASK);
@@ -1178,6 +1199,7 @@ void JobAf::v_refresh( time_t currentTime, AfContainer * pointer, MonitorContain
 		uint32_t state_block = m_blocks_data[b]->getState();
 		m_state  = m_state | (state_block &   AFJOB::STATE_RUNNING_MASK   );
 		m_state  = m_state | (state_block &   AFJOB::STATE_WARNING_MASK   );
+		m_state  = m_state | (state_block &   AFJOB::STATE_SUSPENDED_MASK );
 		m_state  = m_state | (state_block &   AFJOB::STATE_ERROR_MASK     );
 		m_state  = m_state | (state_block &   AFJOB::STATE_READY_MASK     );
 		m_state  = m_state | (state_block &   AFJOB::STATE_SKIPPED_MASK   );
@@ -1274,6 +1296,9 @@ void JobAf::v_refresh( time_t currentTime, AfContainer * pointer, MonitorContain
 	}
 	
 	if(( monitoring ) &&  ( jobchanged )) monitoring->addJobEvent( jobchanged, getId(), getUid());
+
+	if (isDone())
+		m_force_refresh = false;
 }
 
 void JobAf::emitEvents(const std::vector<std::string> & i_events) const
@@ -1305,14 +1330,14 @@ void JobAf::emitEvents(const std::vector<std::string> & i_events) const
 		m_user_name, m_name, i_events[0]);
 }
 
-void JobAf::restartAllTasks( const std::string & i_message, RenderContainer * i_renders, MonitorContainer * i_monitoring, uint32_t i_state)
+void JobAf::restartAllTasks(const std::string & i_message, RenderContainer * i_renders, MonitorContainer * i_monitoring, uint32_t i_with_state)
 {
 	for( int b = 0; b < m_blocks_num; b++)
 	{
 		int numtasks = m_blocks_data[b]->getTasksNum();
 		for( int t = 0; t < numtasks; t++)
 		{
-			m_blocks[b]->m_tasks[t]->restart( i_message, i_renders, i_monitoring, i_state);
+			m_blocks[b]->m_tasks[t]->operation(i_message, i_renders, i_monitoring, i_with_state, AFJOB::STATE_READY_MASK);
 		}
 	}
 

@@ -44,8 +44,12 @@ function ab_Init()
 
 function ab_OpenWindow(i_close_header)
 {
+	if (false == g_admin)
+		return;
+
 	if (i_close_header)
 		u_OpenCloseHeader();
+
 	ab_wnd = new cgru_Window({"name": 'artbook', "title": 'ArtBook', 'padding': '3% 1%'});
 	ab_wnd.elContent.classList.add('artbook');
 
@@ -506,11 +510,14 @@ ArtPage.prototype.activityReceived = function(i_data)
 	this.elBtnActClose.style.display = 'block';
 	this.elActivity.textContent = '';
 
+	this.elActsArray = [];
+
 	let stat = {};
 	stat.count = 0;
 	stat.time_min = 0;
 	stat.time_max = 0;
 	stat.flags = {};
+	stat.tags = {};
 
 	for (let path in i_data)
 	{
@@ -518,6 +525,7 @@ ArtPage.prototype.activityReceived = function(i_data)
 
 		let elAct = document.createElement('div');
 		this.elActivity.appendChild(elAct);
+		this.elActsArray.push(elAct);
 		elAct.classList.add('artpage_act');
 
 		let elPath = document.createElement('a');
@@ -568,6 +576,8 @@ ArtPage.prototype.activityReceived = function(i_data)
 
 		// Collect stat:
 		stat.count += 1;
+
+		elAct.mtime = 0;
 		if (act.mtime)
 		{
 			if (stat.count == 1)
@@ -582,43 +592,169 @@ ArtPage.prototype.activityReceived = function(i_data)
 				if (stat.time_max < act.mtime)
 					stat.time_max = act.mtime;
 			}
+			elAct.mtime = act.mtime;
 		}
+
+		elAct.m_flags = [];
 		if (act.task.flags)
 		{
 			for (let flag of act.task.flags)
 			{
+				elAct.m_flags.push(flag);
+
 				if (flag in stat.flags)
 					stat.flags[flag] += 1;
 				else
 					stat.flags[flag] = 1;
 			}
 		}
+
+		elAct.m_tags = [];
+		if (act.task.tags)
+		{
+			for (let tag of act.task.tags)
+			{
+				elAct.m_tags.push(tag);
+
+				if (tag in stat.tags)
+					stat.tags[tag] += 1;
+				else
+					stat.tags[tag] = 1;
+			}
+		}
 	}
 
+	this.elActivityFilteredCounts = document.createElement('div');
+	this.elActivityInfo.appendChild(this.elActivityFilteredCounts);
+	this.elActivityFilteredCounts.classList.add('activity_filtered_counts');
 
 	let elCount = document.createElement('div');
 	this.elActivityInfo.appendChild(elCount);
-	elCount.textContent = 'Count = ' + stat.count;
+	elCount.textContent = 'Total count = ' + stat.count;
 
-	let elTime = document.createElement('div');
-	this.elActivityInfo.appendChild(elTime);
-	elTime.textContent = c_DT_StrFromSec(stat.time_min) + ' - ' + c_DT_StrFromSec(stat.time_max);
+	let elTimeDiv = document.createElement('div');
+	this.elActivityInfo.appendChild(elTimeDiv);
+	elTimeDiv.classList.add('time_div')
 
+	this.elActivityTimeEdit = document.createElement('div');
+	elTimeDiv.appendChild(this.elActivityTimeEdit);
+	this.elActivityTimeEdit.contentEditable = true;
+	this.elActivityTimeEdit.classList.add('editing','time_edit');
+	this.elActivityTimeEdit.textContent = c_DT_FormStrFromSec(stat.time_min) + ' - ' + c_DT_FormStrFromSec(stat.time_max);
+
+	let elActivityTimeBtn = document.createElement('div');
+	elTimeDiv.appendChild(elActivityTimeBtn);
+	elActivityTimeBtn.classList.add('button');
+	elActivityTimeBtn.textContent = 'Filter';
+	elActivityTimeBtn.m_page = this;
+	elActivityTimeBtn.onclick = function(e){e.currentTarget.m_page.activityFilter()};
+
+	this.actTagsSelected = [];
+	for (let tag in stat.tags)
+	{
+		let elTag = st_CreateElTag(tag, false, (': ' + stat.tags[tag]));
+		this.elActivityInfo.appendChild(elTag);
+		elTag.m_artpage = this;
+		elTag.onclick = ab_ActivityTagClicked;
+	}
+
+	this.actFlagsSelected = [];
 	for (let flag in stat.flags)
 	{
-		let elFlag = document.createElement('div');
+		let elFlag = st_CreateElFlag(flag, false, (': ' + stat.flags[flag]));
 		this.elActivityInfo.appendChild(elFlag);
-		elFlag.classList.add('tag','flag');
-		elFlag.textContent = c_GetFlagTitle(flag) + ' x ' + stat.flags[flag];
-		elFlag.title = c_GetFlagTip(flag);
-		let clr = null;
-		if (RULES.flags[flag] && RULES.flags[flag].clr)
-			clr = RULES.flags[flag].clr;
-		if (clr)
-			st_SetElColor({"color": clr}, elFlag);
+		elFlag.m_artpage = this;
+		elFlag.onclick = ab_ActivityFlagClicked;
 	}
 }
+function ab_ActivityTagClicked(e)
+{
+	let el = e.currentTarget;
+	c_ElToggleSelected(el);
+	el.m_artpage.activityTagClicked(el.m_name);
+}
+function ab_ActivityFlagClicked(e)
+{
+	let el = e.currentTarget;
+	c_ElToggleSelected(el);
+	el.m_artpage.activityFlagClicked(el.m_name);
+}
+ArtPage.prototype.activityTagClicked = function(i_tag)
+{
+	if (this.actTagsSelected.includes(i_tag))
+		this.actTagsSelected.splice(this.actTagsSelected.indexOf(i_tag), 1);
+	else
+		this.actTagsSelected.push(i_tag);
 
+	this.activityFilter();
+}
+ArtPage.prototype.activityFlagClicked = function(i_flag)
+{
+	if (this.actFlagsSelected.includes(i_flag))
+		this.actFlagsSelected.splice(this.actFlagsSelected.indexOf(i_flag), 1);
+	else
+		this.actFlagsSelected.push(i_flag);
+
+	this.activityFilter();
+}
+ArtPage.prototype.activityFilter = function()
+{
+	let time_edit = this.elActivityTimeEdit.textContent;
+	time_edit = time_edit.split(' - ');
+	let time_min = c_DT_SecFromStr(time_edit[0]);
+	let time_max = c_DT_SecFromStr(time_edit[1]) + 60; // Add a minute as seconds are not displayed
+
+	let shown = 0;
+	let hidden = 0;
+
+	for (let elAct of this.elActsArray)
+	{
+		let found = true;
+
+		if (found && (time_min > 0) && (elAct.mtime < time_min))
+			found = false;
+		if (found && (time_max > 0) && (elAct.mtime > time_max))
+			found = false;
+
+		if (found && this.actTagsSelected.length)
+		{
+			found = false;
+			for (let tag of this.actTagsSelected)
+				if (elAct.m_tags.includes(tag))
+				{
+					found = true;
+					break;
+				}
+		}
+
+		if (found && this.actFlagsSelected.length)
+		{
+			found = false;
+			for (let flag of this.actFlagsSelected)
+				if (elAct.m_flags.includes(flag))
+				{
+					found = true;
+					break;
+				}
+		}
+
+		if (found)
+		{
+			elAct.style.display = 'block';
+			shown += 1;
+		}
+		else
+		{
+			elAct.style.display = 'none';
+			hidden += 1;
+		}
+	}
+
+	if (hidden)
+		this.elActivityFilteredCounts.textContent = ' Filtered count = ' + shown;
+	else
+		this.elActivityFilteredCounts.textContent = '';
+}
 
 function ArtPagePrj(i_el, i_project, i_artist)
 {
@@ -713,21 +849,13 @@ ArtPagePrj.prototype.showStat = function()
 		let elName = document.createElement('div');
 		elAct.appendChild(elName);
 		elName.classList.add('name');
-		elName.innerHTML = '<b>' + act + '</b> x ' + acts[act].count;
+		elName.innerHTML = '<b>' + act + '</b>: ' + acts[act].count;
 
 		if ('flags' in acts[act])
 			for (let flag in acts[act].flags)
 			{
-				let elFlag = document.createElement('div');
+				let elFlag = st_CreateElFlag(flag, false, (': ' + acts[act].flags[flag]));
 				elAct.appendChild(elFlag);
-				elFlag.classList.add('tag','flag');
-				elFlag.textContent = c_GetFlagTitle(flag) + ' x ' + acts[act].flags[flag];
-				elFlag.title = c_GetFlagTip(flag);
-				let clr = null;
-				if (RULES.flags[flag] && RULES.flags[flag].clr)
-					clr = RULES.flags[flag].clr;
-				if (clr)
-					st_SetElColor({"color": clr}, elFlag);
 			}
 	}
 }

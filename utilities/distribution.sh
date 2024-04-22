@@ -1,9 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 echo "Detecting UNIX distribution..."
 
-distskeys="Debian Ubuntu Rocky CentOS Red Fedora openSUSE Simply Gentoo Mint SUSE Mageia Arch Manjaro ROSA Astra"
-knowndists="Debian Ubuntu Rocky CentOS RedHat Fedora openSUSE AltLinux MacOSX Gentoo Mint SUSE Mageia Arch Manjaro ROSA Astra"
+distskeys="Debian Ubuntu Rocky CentOS Red Fedora openSUSE Simply Gentoo Mint SUSE Mageia Arch Manjaro ROSA Astra FreeBSD"
+knowndists="Debian Ubuntu Rocky CentOS RedHat Fedora openSUSE AltLinux MacOSX Gentoo Mint SUSE Mageia Arch Manjaro ROSA Astra FreeBSD"
 
 # MacOSX
 if [ `uname` == "Darwin" ]; then
@@ -11,7 +11,7 @@ if [ `uname` == "Darwin" ]; then
 	export DISTRIBUTIVE_VERSION=$(sw_vers -productVersion)
 fi
 
-# Linuxes os-release file:
+# UNIX-s os-release file:
 osreleasefile="/etc/os-release"
 if [ -z "${DISTRIBUTIVE}" ] && [ -f "${osreleasefile}" ]; then
 	source "${osreleasefile}"
@@ -76,6 +76,8 @@ export ARCHITECTURE=`uname -m`
 function debianArch(){
 	if [ "${ARCHITECTURE}" == "x86_64" ]; then
 		export ARCHITECTURE="amd64"
+	elif [ "${ARCHITECTURE}" == "aarch64" ]; then
+		export ARCHITECTURE="arm64"
 	else
 		export ARCHITECTURE="i386"
 	fi
@@ -91,6 +93,12 @@ function redhatArch(){
 	export PACKAGE_MANAGER="yum"
 	export PACKAGE_INSTALL="$PACKAGE_MANAGER install"
 	export RELEASE_NUMBER="0"
+}
+
+# BSD:
+function bsdArch(){
+	export PACKAGE_MANAGER="pkg"
+	export PACKAGE_INSTALL="$PACKAGE_MANAGER install"
 }
 
 # Case distribution:
@@ -138,6 +146,9 @@ case ${DISTRIBUTIVE} in
 	Red)
 		export DISTRIBUTIVE="RedHat"
 		redhatArch
+		;;
+	FreeBSD)
+		bsdArch
 		;;
 	*)
 		redhatArch

@@ -89,13 +89,16 @@ AttrColor QEnvironment::clr_itemjoboff(      "clr_itemjoboff",       "Offline Jo
 AttrColor QEnvironment::clr_itemjobppa(      "clr_itemjobppa",       "Preview Pending Approval",AFGUI::CLR_ITEMJOBPPA          );
 AttrColor QEnvironment::clr_itemjobwtime(    "clr_itemjobwtime",     "Wainting Time Job",       AFGUI::CLR_ITEMJOBWTIME        );
 AttrColor QEnvironment::clr_itemjobwdep(     "clr_itemjobwdep",      "Job Waits Depends",       AFGUI::CLR_ITEMJOBWDEP         );
+AttrColor QEnvironment::clr_itemjobsuspended("clr_itemjobsuspended", "Suspended Job",           AFGUI::CLR_ITEMJOBSUSPENDED    );
 AttrColor QEnvironment::clr_itemjobdone(     "clr_itemjobdone",      "Done Job",                AFGUI::CLR_ITEMJOBDONE         );
 AttrColor QEnvironment::clr_itemjoberror(    "clr_itemjoberror",     "Job With Error(s)",       AFGUI::CLR_ITEMJOBERROR        );
 AttrColor QEnvironment::clr_itemjobwarning(  "clr_itemjobwarning",   "Job Warning",             AFGUI::CLR_ITEMJOBWARNING      );
 AttrColor QEnvironment::clr_taskwarningrun(  "clr_taskwarningrun",   "Warning Run Task",        AFGUI::CLR_TASKWARNINGRUN      );
+AttrColor QEnvironment::clr_taskwarningdone( "clr_taskwarningdone",  "Warning Done Task",       AFGUI::CLR_TASKWARNINGDONE     );
 AttrColor QEnvironment::clr_taskskipped(     "clr_taskskipped",      "Skipped Task",            AFGUI::CLR_TASKSKIPPED         );
 AttrColor QEnvironment::clr_taskwaitreconn(  "clr_taskwaitreconn",   "Waiting Reconnect Task",  AFGUI::CLR_TASKWAITRECONN      );
 AttrColor QEnvironment::clr_tasktrynext(     "clr_tasktrynext",      "Trying This Task Next",   AFGUI::CLR_TASKTRYNEXT         );
+AttrColor QEnvironment::clr_tasksuspended(   "clr_tasksuspended",    "Suspended Task",          AFGUI::CLR_TASKSUSPENDED       );
 AttrColor QEnvironment::clr_itemrender(      "clr_itemrender",       "Render Item",             AFGUI::CLR_ITEMRENDER          );
 AttrColor QEnvironment::clr_itemrenderoff(   "clr_itemrenderoff",    "Offine Render",           AFGUI::CLR_ITEMRENDEROFF       );
 AttrColor QEnvironment::clr_itemrenderbusy(  "clr_itemrenderbusy",   "Busy Render",             AFGUI::CLR_ITEMRENDERBUSY      );

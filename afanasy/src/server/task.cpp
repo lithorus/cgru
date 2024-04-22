@@ -263,42 +263,32 @@ void Task::v_refresh( time_t currentTime, RenderContainer * renders, MonitorCont
    deleteRunningZombie();
 }
 
-void Task::restart( const std::string & i_message, RenderContainer * i_renders, MonitorContainer * i_monitoring, uint32_t i_state)
+void Task::operation(const std::string & i_message, RenderContainer * i_renders, MonitorContainer * i_monitoring, uint32_t i_with_state, uint32_t i_set_state)
 {
-	if( i_state != 0 )
+	if (i_with_state != 0 )
 	{
-		// If request is to restart done tasks, we shoud skip skipped tasks
-		// which are always done too
-		if(( i_state == AFJOB::STATE_DONE_MASK ) && ( m_progress->state & AFJOB::STATE_SKIPPED_MASK ))
-			return;
+		// We should apply operation to tasks with specified state
 
-		if(( m_progress->state & i_state ) == 0 )
+		if ((i_with_state == AFJOB::STATE_DONE_MASK) && (m_progress->state & AFJOB::STATE_SKIPPED_MASK))
+		{
+			// If request with done tasks, we should skip skipped tasks,
+			// which are always done too
+			return;
+		}
+
+		if ((m_progress->state & i_with_state) == 0)
 			return;
 	}
-
-	if( m_run )
-	{
-		m_run->restart( i_message, i_renders, i_monitoring);
-		return;
-	}
-
-	m_progress->state = AFJOB::STATE_READY_MASK;
-	m_progress->errors_count = 0;
-	v_store();
-	v_monitor( i_monitoring);
-	v_appendLog( i_message);
-}
-
-void Task::skip(const std::string & i_message, RenderContainer * i_renders, MonitorContainer * i_monitoring, uint32_t i_state)
-{
-	if (m_progress->state & AFJOB::STATE_DONE_MASK)
-		return;
 
 	if (m_run)
-		m_run->skip(i_message, i_renders, i_monitoring, i_state);
+	{
+		// Running task can't be ready immediately, it should be stopped before.
+		i_set_state = i_set_state & (~AFJOB::STATE_READY_MASK);
+		m_run->stop(i_message + " (is running)", i_renders, i_monitoring, i_set_state);
+	}
 	else
 	{
-		m_progress->state = i_state;
+		m_progress->state = i_set_state;
 		m_progress->errors_count = 0;
 		v_store();
 		v_monitor(i_monitoring);

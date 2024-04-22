@@ -623,17 +623,10 @@ function st_SetElFlags(i_status, i_elFlags, i_short, i_clickable)
 	if (i_status && i_status.flags)
 		for (let flag of i_status.flags)
 		{
-			let el = document.createElement('div');
+			let el = st_CreateElFlag(flag, i_short);
 			elements.push(el);
 			i_elFlags.appendChild(el);
 			i_elFlags.m_elFlags.push(el);
-			el.classList.add('flag');
-			if (i_short)
-				el.textContent = c_GetFlagShort(flag);
-			else
-				el.textContent = c_GetFlagTitle(flag);
-			el.title = c_GetFlagTip(flag);
-			el.m_name = flag;
 			st_TagHilight(el, 'flag');
 
 			if (i_clickable)
@@ -641,15 +634,30 @@ function st_SetElFlags(i_status, i_elFlags, i_short, i_clickable)
 				el.onclick = st_TagClicked;
 				el.ondblclick = st_FlagDblClicked;
 			}
-
-			let clr = null;
-			if (RULES.flags[flag] && RULES.flags[flag].clr)
-				clr = RULES.flags[flag].clr;
-			if (clr)
-				st_SetElColor({"color": clr}, el);
 		}
 
 	return elements;
+}
+function st_CreateElFlag(i_flag, i_short, i_suffix)
+{
+	let el = document.createElement('div');
+	el.classList.add('flag');
+	let label = c_GetFlagTitle(i_flag);
+	if (i_short)
+		label = c_GetFlagShort(i_flag);
+	if (i_suffix)
+		label += i_suffix;
+	el.textContent = label;
+	el.title = c_GetFlagTip(i_flag);
+	el.m_name = i_flag;
+
+	let clr = null;
+	if (RULES.flags[i_flag] && RULES.flags[i_flag].clr)
+		clr = RULES.flags[i_flag].clr;
+	if (clr)
+		st_SetElColor({"color": clr}, el);
+
+	return el;
 }
 function st_SetElTags(i_status, i_elTags, i_short, i_clickable)
 {
@@ -663,17 +671,10 @@ function st_SetElTags(i_status, i_elTags, i_short, i_clickable)
 	if (i_status && i_status.tags)
 		for (let i = 0; i < i_status.tags.length; i++)
 		{
-			let el = document.createElement('div');
+			let el = st_CreateElTag(i_status.tags[i], i_short);
 			elements.push(el);
 			i_elTags.appendChild(el);
 			i_elTags.m_elTags.push(el);
-			el.classList.add('tag');
-			if (i_short)
-				el.textContent = c_GetTagShort(i_status.tags[i]);
-			else
-				el.textContent = c_GetTagTitle(i_status.tags[i]);
-			el.title = c_GetTagTip(i_status.tags[i]);
-			el.m_name = i_status.tags[i];
 
 			st_TagHilight(el, 'tag');
 
@@ -687,6 +688,21 @@ function st_SetElTags(i_status, i_elTags, i_short, i_clickable)
 		}
 
 	return elements;
+}
+function st_CreateElTag(i_tag, i_short, i_suffix)
+{
+	let el = document.createElement('div');
+	el.classList.add('tag');
+	let label = c_GetTagTitle(i_tag);
+	if (i_short)
+		label = c_GetTagShort(i_tag);
+	if (i_suffix)
+		label += i_suffix;
+	el.textContent = label;
+	el.title = c_GetTagTip(i_tag);
+	el.m_name = i_tag;
+
+	return el;
 }
 function st_TagHilight(i_el, i_key)
 {

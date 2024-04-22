@@ -100,13 +100,16 @@ public:
 	static AttrColor clr_itemjobppa;
 	static AttrColor clr_itemjobwtime;
 	static AttrColor clr_itemjobwdep;
+	static AttrColor clr_itemjobsuspended;
 	static AttrColor clr_itemjobdone;
 	static AttrColor clr_itemjoberror;
 	static AttrColor clr_itemjobwarning;
+	static AttrColor clr_taskwarningdone;
 	static AttrColor clr_taskwarningrun;
 	static AttrColor clr_taskskipped;
 	static AttrColor clr_taskwaitreconn;
 	static AttrColor clr_tasktrynext;
+	static AttrColor clr_tasksuspended;
 	static AttrColor clr_itemrender;
 	static AttrColor clr_itemrenderoff;
 	static AttrColor clr_itemrenderbusy;

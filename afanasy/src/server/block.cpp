@@ -568,31 +568,40 @@ bool Block::action( Action & i_action)
 		}
 		else if (type == "skip")
 		{
-			skipRestartTasks(true, "Tasks skip by " + i_action.author, i_action, operation, AFJOB::STATE_SKIPPED_MASK | AFJOB::STATE_DONE_MASK);
+			tasksOperation("Tasks skip by " + i_action.author, i_action, operation, ~AFJOB::STATE_DONE_MASK, AFJOB::STATE_SKIPPED_MASK | AFJOB::STATE_DONE_MASK);
+		}
+		else if (type == "suspend")
+		{
+			tasksOperation("Tasks suspend by " + i_action.author, i_action, operation,
+					AFJOB::STATE_READY_MASK | AFJOB::STATE_RUNNING_MASK | AFJOB::STATE_SKIPPED_MASK, AFJOB::STATE_SUSPENDED_MASK);
+		}
+		else if (type == "continue")
+		{
+			tasksOperation("Tasks continue by " + i_action.author, i_action, operation, AFJOB::STATE_SUSPENDED_MASK, AFJOB::STATE_READY_MASK);
 		}
 		else if (type == "done")
 		{
-			skipRestartTasks(true, "Tasks set done by " + i_action.author, i_action, operation, AFJOB::STATE_DONE_MASK);
+			tasksOperation("Tasks set done by " + i_action.author, i_action, operation, ~AFJOB::STATE_DONE_MASK, AFJOB::STATE_DONE_MASK);
 		}
 		else if (type == "restart")
 		{
-			skipRestartTasks(false, "Tasks restart by " + i_action.author, i_action, operation, 0 /*any task*/);
+			tasksOperation("Tasks restart by " + i_action.author, i_action, operation, 0 /*with any task*/, AFJOB::STATE_READY_MASK);
 		}
 		else if (type == "restart_running")
 		{
-			skipRestartTasks(false, "Restart running tasks by " + i_action.author, i_action, operation, AFJOB::STATE_RUNNING_MASK);
+			tasksOperation("Restart running tasks by " + i_action.author, i_action, operation, AFJOB::STATE_RUNNING_MASK, 0 /*does not set any state*/);
 		}
 		else if (type == "restart_skipped")
 		{
-			skipRestartTasks(false, "Restart skipped tasks by " + i_action.author, i_action, operation, AFJOB::STATE_SKIPPED_MASK);
+			tasksOperation("Restart skipped tasks by " + i_action.author, i_action, operation, AFJOB::STATE_SKIPPED_MASK, AFJOB::STATE_READY_MASK);
 		}
 		else if (type == "restart_done")
 		{
-			skipRestartTasks(false, "Restart done tasks by " + i_action.author, i_action, operation, AFJOB::STATE_DONE_MASK);
+			tasksOperation("Restart done tasks by " + i_action.author, i_action, operation, AFJOB::STATE_DONE_MASK, AFJOB::STATE_READY_MASK);
 		}
 		else if (type == "restart_errors")
 		{
-			skipRestartTasks(false, "Restart error tasks by " + i_action.author, i_action, operation, AFJOB::STATE_ERROR_MASK);
+			tasksOperation("Restart error tasks by " + i_action.author, i_action, operation, AFJOB::STATE_ERROR_MASK, AFJOB::STATE_READY_MASK);
 		}
 		else if (type == "trynext")
 		{
@@ -683,7 +692,7 @@ bool Block::editTickets(Action & i_action, const JSON & operation)
 	return true;
 }
 
-void Block::skipRestartTasks(bool i_skip, const std::string & i_message, const Action & i_action, const JSON & i_operation, uint32_t i_state)
+void Block::tasksOperation(const std::string & i_message, const Action & i_action, const JSON & i_operation, uint32_t i_with_state, uint32_t i_set_state)
 {
 	std::vector<int32_t> tasks_vec;
 	af::jr_int32vec("task_ids", tasks_vec, i_operation);
@@ -706,14 +715,9 @@ void Block::skipRestartTasks(bool i_skip, const std::string & i_message, const A
 			}
 		}
 
-		if (i_skip)
-			m_tasks[t]->skip(i_message, i_action.renders, i_action.monitors, i_state);
-		else
-		{
-			m_data->setTimeStarted(time(NULL), true);
-			m_data->setTimeDone(0);
-			m_tasks[t]->restart(i_message, i_action.renders, i_action.monitors, i_state);
-		}
+		m_tasks[t]->operation(i_message, i_action.renders, i_action.monitors, i_with_state, i_set_state);
+
+		m_job->forceRefresh();
 	}
 }
 

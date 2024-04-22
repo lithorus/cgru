@@ -74,9 +74,10 @@ TaskRun::~TaskRun()
 {
 AFINFA("TaskRun:: ~ TaskRun: %s[%d][%d]:", m_block->m_job->getName().c_str(), m_block->m_data->getBlockNum(), m_tasknum)
 
-   if( m_progress->state & AFJOB::STATE_DONE_MASK    ) return;
-   if( m_progress->state & AFJOB::STATE_ERROR_MASK   ) return;
-   if( m_progress->state & AFJOB::STATE_SKIPPED_MASK ) return;
+	if( m_progress->state & AFJOB::STATE_DONE_MASK     ) return;
+	if( m_progress->state & AFJOB::STATE_ERROR_MASK    ) return;
+	if( m_progress->state & AFJOB::STATE_SKIPPED_MASK  ) return;
+	if( m_progress->state & AFJOB::STATE_SUSPENDED_MASK) return;
 
    m_progress->state = AFJOB::STATE_READY_MASK;
 }
@@ -230,8 +231,8 @@ void TaskRun::update(const af::MCTaskUp& taskup, RenderContainer * renders, Moni
    }
    case af::TaskExec::UPEject:
    {
-      restart("Host owner ejected.", renders, monitoring);
-      break;
+		stop("Host owner ejected.", renders, monitoring);
+		break;
    }
    case af::TaskExec::UPRenderDeregister:
    {
@@ -295,7 +296,7 @@ bool TaskRun::refresh( time_t currentTime, RenderContainer * renders, MonitorCon
 	return changed;
 }
 
-void TaskRun::stop( const std::string & message, RenderContainer * renders, MonitorContainer * monitoring)
+void TaskRun::stop(const std::string & message, RenderContainer * renders, MonitorContainer * monitoring, uint32_t i_state)
 {
 //printf("TaskRun::stop: %s[%d][%d] HostID=%d: %s\n", m_block->m_job->getName().c_str(), m_block->m_data->getBlockNum(), m_tasknum, m_hostId, message.c_str());
    if( m_zombie ) return;
@@ -305,6 +306,13 @@ void TaskRun::stop( const std::string & message, RenderContainer * renders, Moni
       AFERRAR("TaskRun::stop: %s[%d][%d] Task executable is NULL.", m_block->m_job->getName().c_str(), m_block->m_data->getBlockNum(), m_tasknum)
       return;
    }
+
+	if (i_state)
+	{
+		// Set new task state if provided (non zero)
+		m_progress->state |= i_state;
+	}
+
    m_stopTime = time( NULL);
 
    if( m_hostId != 0 )
@@ -348,19 +356,6 @@ void TaskRun::finish( const std::string & message, RenderContainer * renders, Mo
 
    m_task->v_appendLog( message);
    m_zombie = true;
-}
-
-void TaskRun::restart(const std::string & i_message, RenderContainer * i_renders, MonitorContainer * i_monitoring)
-{
-	if (m_zombie) return;
-	stop(i_message + " Is running.", i_renders, i_monitoring);
-}
-
-void TaskRun::skip(const std::string & i_message, RenderContainer * i_renders, MonitorContainer * i_monitoring, uint32_t i_state)
-{
-   if (m_zombie) return;
-   m_progress->state |= i_state;
-   stop(i_message + " Is running.", i_renders, i_monitoring);
 }
 
 int TaskRun::v_getRunningRenderID( std::string & o_error) const
