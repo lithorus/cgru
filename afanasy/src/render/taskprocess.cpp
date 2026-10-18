@@ -136,8 +136,52 @@ TaskProcess::TaskProcess( af::TaskExec * i_taskExec, RenderHost * i_render):
 		af::removeDir( m_store_dir);
 	af::pathMakePath( m_store_dir);
 
+	// Initialize Loki log writer BEFORE initializing Python service:
+	LogWriter *log_writer = nullptr;
+	std::string loki_url = m_taskexec->getLokiUrl();
+	if (!loki_url.empty())
+	{
+		LogTaskContext ctx;
+		ctx.job_id = m_taskexec->getJobId();
+		ctx.block_num = m_taskexec->getBlockNum();
+		ctx.task_num = m_taskexec->getTaskNum();
+		ctx.session_num = m_taskexec->getNumber();
+		ctx.service = m_taskexec->getServiceType();
+		ctx.host_name = m_render ? m_render->getName() : "";
+		ctx.job_name = m_taskexec->getJobName();
+		ctx.block_name = m_taskexec->getBlockName();
+
+		// Parse host, port, and path from loki_url (e.g. "http://loki.host:3100/loki/api/v1/push")
+		std::string host = "127.0.0.1";
+		int port = 3100;
+		std::string path = "/loki/api/v1/push";
+
+		std::string temp = loki_url;
+		if (temp.find("http://") == 0) temp = temp.substr(7);
+		else if (temp.find("https://") == 0) temp = temp.substr(8);
+
+		size_t slash = temp.find('/');
+		if (slash != std::string::npos)
+		{
+			path = temp.substr(slash);
+			temp = temp.substr(0, slash);
+		}
+		size_t colon = temp.find(':');
+		if (colon != std::string::npos)
+		{
+			host = temp.substr(0, colon);
+			port = std::atoi(temp.substr(colon + 1).c_str());
+		}
+		else
+		{
+			host = temp;
+		}
+
+		log_writer = new LokiLogWriter(ctx, host, port, path);
+	}
+
 	m_service = new af::Service(m_taskexec, m_store_dir);
-	m_parser = new ParserHost(m_service);
+	m_parser = new ParserHost(m_service, log_writer);
 
 	if (false == m_service->isInitialized())
 	{
@@ -329,7 +373,11 @@ TaskProcess::~TaskProcess()
 		delete m_service;
 
 	if (m_parser)
+	{
+		// Allow background network threads in parser / log-writer to complete final send
+		af::sleep_msec(50);
 		delete m_parser;
+	}
 
 	af::removeDir( m_store_dir);
 
@@ -647,9 +695,54 @@ void TaskProcess::sendTaskSate()
 
 void TaskProcess::processFinished( int i_exitCode)
 {
-	AF_LOG << "Finished PID=" << m_pid << ": Exit Code=" << i_exitCode
-		<< " Status=" << WEXITSTATUS( i_exitCode) << (m_stop_time ? " (stopped)":"")
-		<< " Time=" << af::time2strHMS(time(NULL) - m_command_launch_time, true);
+	std::string resources;
+	if (m_render)
+	{
+		resources += "{\n";
+		resources += m_render->getResourcesString();
+		resources += "\n}";
+	}
+	else
+	{
+		resources = "{}";
+	}
+
+	// Drain remaining bytes in the pipes. In non-blocking mode, multiple
+	// reads ensure any pending data flushed by the dying process is consumed.
+	for (int drain_attempts = 0; drain_attempts < 5; ++drain_attempts)
+	{
+		std::string output;
+		int readsize = 0;
+		do {
+			readsize = readPipe(m_io_output);
+			if (readsize > 0)
+				output += std::string(m_readbuffer, readsize);
+		} while (readsize > 0);
+
+		do {
+			readsize = readPipe(m_io_outerr);
+			if (readsize > 0)
+				output += std::string(m_readbuffer, readsize);
+		} while (readsize > 0);
+
+		if (output.empty())
+			break;
+
+		m_parser->read(af::itos(i_exitCode) + ':' + af::itos(m_stop_time), 0, output, resources);
+
+		// Short yield to allow any final kernel pipe buffers to flush
+		af::sleep_msec(10);
+	}
+
+	// Read process last output mode
+	readProcess( af::itos( i_exitCode) + ':' + af::itos( m_stop_time));
+
+	// If the parser has trailing un-newline'd buffer, push a newline
+	if (m_parser)
+	{
+		std::string final_nl = "\n";
+		m_parser->read(af::itos(i_exitCode) + ':' + af::itos(m_stop_time), 0, final_nl, resources);
+	}
 
 	// Zero m_pid means that task is not running any more
 	m_pid = 0;
@@ -671,6 +764,16 @@ void TaskProcess::processFinished( int i_exitCode)
 
 	// Read process last output
 	readProcess( af::itos( i_exitCode) + ':' + af::itos( m_stop_time));
+	/*
+	// If the last output chunk didn't end with a newline, push "\n"
+	// so line-based loggers emit the final incomplete line
+	if (m_parser)
+	{
+		std::string final_nl = "\n";
+		std::string empty_res;
+		m_parser->read(af::itos(i_exitCode) + ':' + af::itos(m_stop_time), 0, final_nl, empty_res);
+	}
+	*/
 
 #ifdef WINNT
 	bool success = m_service->checkExitStatus( i_exitCode);

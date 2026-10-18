@@ -591,6 +591,27 @@ void Task::getOutput( af::MCTask & io_mctask, std::string & o_error) const
 		}
 	}
 
+	if( !af::Environment::getLokiURL().empty() )
+	{
+		af::pathMakePath(m_store_dir_output);
+		std::string loki_file = m_store_dir_output + AFGENERAL::PATH_SEPARATOR + "loki_" + af::itos(start_num) + ".json";
+		if( !af::pathFileExists(loki_file) )
+		{
+			std::ostringstream str;
+			str << "{\"task_output\":{";
+			str << "\"loki_url\":\"" << af::Environment::getLokiURL() << "\",";
+			str << "\"job_id\":" << m_block->m_job->getId() << ",";
+			str << "\"job_name\":\"" << af::strEscape(m_block->m_job->getName()) << "\",";
+			str << "\"block_num\":" << m_block->m_data->getBlockNum() << ",";
+			str << "\"task_num\":" << m_number << ",";
+			str << "\"session_num\":" << start_num;
+			str << "}}";
+			AFCommon::writeFile(str.str(), loki_file);
+		}
+		io_mctask.setOutput(loki_file);
+		return;
+	}
+
 	io_mctask.setOutput( getOutputFileName( start_num));
 }
 

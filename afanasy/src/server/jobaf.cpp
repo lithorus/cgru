@@ -1038,12 +1038,16 @@ bool JobAf::solveTaskOnRender(RenderAf * i_render, int i_block_num, int i_task_n
 	// Fill some TaskExec fields:
 	task_exec->setJobName(m_name);
 	task_exec->setUserName(m_user_name);
+	task_exec->setNumber(m_progress->tp[i_block_num][i_task_num]->starts_count + 1);
 	if (hasCustomData())
 		task_exec->setDataString("job_custom_data", m_custom_data);
 	if (i_render->hasCustomData())
 		task_exec->setDataString("render_custom_data", i_render->getCustomData());
 	if (m_user->hasCustomData())
 		task_exec->setDataString("user_custom_data", m_user->getCustomData());
+
+	if (!af::Environment::getLokiURL().empty())
+		task_exec->setLokiUrl(af::Environment::getLokiURL());
 
 	// Job was not able to start a task.
 	// This should not happen.

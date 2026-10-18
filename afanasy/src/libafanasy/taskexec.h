@@ -70,6 +70,9 @@ public:
 	inline const std::string & getJobName() const { return m_job_name; }
 	inline int getJobId() const { return m_job_id; }
 
+	// Get loki url
+	inline const std::string & getLokiUrl() const { return m_loki_url; }
+
 	// Get user data:
 	inline const std::string & getUserName() const { return m_user_name;  }
 
@@ -155,6 +158,7 @@ public:
 	inline void setBlockName( const std::string & i_str) {m_block_name        = i_str;}
 	inline void setJobName(   const std::string & i_str) {m_job_name          = i_str;}
 	inline void setUserName(  const std::string & i_str) {m_user_name         = i_str;}
+	inline void setLokiUrl(   const std::string & i_str) {m_loki_url          = i_str;}
 	inline void setWDir(      const std::string & i_str) {m_working_directory = i_str;}
 	inline void setTaskNumber(int i_num) {m_task_num = i_num;}
 	inline void setNumber(    int i_num) {m_number   = i_num;}
@@ -195,6 +199,7 @@ private:
 	std::string m_block_name;         ///< Task block name.
 	std::string m_job_name;           ///< Task job name.
 	std::string m_user_name;          ///< Task user name.
+	std::string m_loki_url;           ///< Loki URL.
 
 	std::string m_working_directory;  ///< Working directory.
 	std::string m_command_block;      ///< Block command.
@@ -239,5 +244,5 @@ private:
 private:
 	/// Needed for af::Render to write running tasks percents:
 	const TaskProgress * m_progress;
-};
+}; 
 }

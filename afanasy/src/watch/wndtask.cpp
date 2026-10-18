@@ -25,6 +25,10 @@
 #include <QScrollArea>
 #include <QSplitter>
 #include <QTextEdit>
+#include <QUrlQuery>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 
 #define AFOUTPUT
 #undef AFOUTPUT
@@ -69,11 +73,13 @@ WndTask::WndTask(const af::MCTaskPos & i_tp, ListTasks * i_parent):
 	m_log_te(NULL),
 	m_errhosts_te(NULL),
 	m_output_te(NULL),
+	m_network_mgr(new QNetworkAccessManager(this)),
 	m_outputs_count(-1),
 	m_output_current(-1),
 	m_tab_current(NULL),
 	m_listening(false)
 {
+	connect(m_network_mgr, SIGNAL(finished(QNetworkReply*)), this, SLOT(slot_lokiReplyFinished(QNetworkReply*)));
 	ms_wndtasks.push_back(this);
 
 	QVBoxLayout * layout = new QVBoxLayout(this);
@@ -580,6 +586,35 @@ void WndTask::showOutput(const af::MCTask & i_mctask)
 {
 	m_tab_widget->setCurrentWidget(m_tab_output);
 
+	// Check if server indicated output lives in Loki
+	std::string output_raw = i_mctask.getOutput();
+	if (output_raw.find("\"loki_url\"") != std::string::npos)
+	{
+		rapidjson::Document doc;
+		if (af::jsonParseData(doc, output_raw.c_str(), output_raw.size()))
+		{
+			if (doc.HasMember("task_output") && doc["task_output"].HasMember("loki_url"))
+			{
+				QString loki_url = afqt::stoq(doc["task_output"]["loki_url"].GetString());
+				int job_id = doc["task_output"]["job_id"].GetInt();
+				QString job_name;
+				if (doc["task_output"].HasMember("job_name") && doc["task_output"]["job_name"].IsString())
+					job_name = afqt::stoq(doc["task_output"]["job_name"].GetString());
+				if (job_name.isEmpty())
+					job_name = afqt::stoq(i_mctask.m_job_name);
+				int block_num = doc["task_output"]["block_num"].GetInt();
+				int task_num = doc["task_output"]["task_num"].GetInt();
+				int session_num = 0;
+				if (doc["task_output"].HasMember("session_num"))
+					session_num = doc["task_output"]["session_num"].GetInt();
+
+				m_output_te->setPlainText("Fetching log directly from Loki (" + loki_url + ")...");
+				queryLokiDirect(loki_url, job_id, job_name, block_num, task_num, session_num);
+				return;
+			}
+		}
+	}
+
 	af::Service service(i_mctask.m_service, i_mctask.m_parser);
 
 	if (service.isInitialized() && service.hasParser())
@@ -595,6 +630,113 @@ void WndTask::showOutput(const af::MCTask & i_mctask)
 	{
 		m_output_te->setPlainText(afqt::stoq(i_mctask.getOutput()));
 	}
+}
+
+void WndTask::queryLokiDirect(const QString &loki_url, int job_id, const QString &job_name, int block_num, int task_num, int session_num)
+{
+	QString base_url = loki_url.trimmed();
+	if (!base_url.startsWith("http://") && !base_url.startsWith("https://"))
+		base_url.prepend("http://");
+
+	if (base_url.endsWith("/loki/api/v1/push"))
+		base_url.chop(17);
+	while (base_url.endsWith('/'))
+		base_url.chop(1);
+
+	// Escape LogQL string literal characters: \ -> \\, " -> \", \n -> \n, \r -> \r, \t -> \t
+	QString escaped_job_name = job_name;
+	escaped_job_name.replace('\\', "\\\\")
+					.replace('"', "\\\"")
+					.replace('\n', "\\n")
+					.replace('\r', "\\r")
+					.replace('\t', "\\t");
+
+	QString logql = "{app=\"afanasy\"";
+	logql += QString(",job_id=\"%1\",block_num=\"%2\",task_num=\"%3\"")
+				 .arg(job_id).arg(block_num).arg(task_num);
+
+	if (!escaped_job_name.isEmpty())
+		logql += QString(",job_name=\"%1\"").arg(escaped_job_name);
+
+	if (session_num > 0)
+		logql += QString(",session_num=\"%1\"").arg(session_num);
+
+	logql += "}";
+
+	// Control parameters in URL query string
+	QUrl url(base_url + "/loki/api/v1/query_range?direction=forward&limit=5000");
+
+	// Only the LogQL expression in the POST body
+	QByteArray body = "query=" + QUrl::toPercentEncoding(logql);
+
+	QNetworkRequest request(url);
+	request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
+
+	// Store outgoing POST body in the request for debug reporting
+	request.setAttribute(QNetworkRequest::User, body);
+
+	m_network_mgr->post(request, body);
+}
+
+void WndTask::slot_lokiReplyFinished(QNetworkReply *reply)
+{
+	reply->deleteLater();
+
+	if (reply->error() != QNetworkReply::NoError)
+	{
+		m_output_te->setPlainText("Error querying Loki directly: " + reply->errorString());
+		return;
+	}
+
+	QByteArray data = reply->readAll();
+	QJsonDocument doc = QJsonDocument::fromJson(data);
+	if (!doc.isObject())
+	{
+		m_output_te->setPlainText("Invalid JSON response received from Loki.");
+		return;
+	}
+
+	// Extract lines: data.result[].values[][1]
+	QJsonObject root = doc.object();
+	QJsonObject dataObj = root["data"].toObject();
+	QJsonArray resultArray = dataObj["result"].toArray();
+
+	QString logText;
+	for (const auto &streamVal : resultArray)
+	{
+		QJsonObject streamObj = streamVal.toObject();
+		QJsonArray valuesArray = streamObj["values"].toArray();
+		for (const auto &valEntry : valuesArray)
+		{
+			QJsonArray entry = valEntry.toArray();
+			if (entry.size() >= 2)
+			{
+				logText.append(entry[1].toString());
+				logText.append("\n");
+			}
+		}
+	}
+
+	if (logText.isEmpty())
+	{
+		int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+		QString postDataSent = QString::fromUtf8(reply->request().attribute(QNetworkRequest::User).toByteArray());
+
+		logText = QString("Loki returned no logs for this task.\n\n"
+						  "--- Debug Information ---\n"
+						  "Requested URL: %1\n"
+						  "HTTP Status: %2\n"
+						  "POST Data Sent:\n%3\n"
+						  "Streams Found: %4\n"
+						  "Raw Response:\n%5")
+					  .arg(reply->url().toString())
+					  .arg(statusCode)
+					  .arg(postDataSent)
+					  .arg(resultArray.size())
+					  .arg(QString::fromUtf8(data));
+	}
+
+	m_output_te->setPlainText(logText);
 }
 
 void WndTask::showLog(const af::MCTask & i_mctask)

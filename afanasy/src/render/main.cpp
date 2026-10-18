@@ -100,6 +100,21 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
+	if( !ENV.getLokiURL().empty())
+	{
+		std::string version;
+		std::string err;
+		if( af::Environment::checkLokiConnection(&version, &err))
+		{
+			if (version != "unknown")
+				AF_LOG << "Loki connection check SUCCESS: " << ENV.getLokiURL() << " (version: " << version << ")";
+			else
+				AF_LOG << "Loki connection check SUCCESS: " << ENV.getLokiURL();
+		}
+		else
+			AF_WARN << "Loki connection check FAILED: " << err;
+	}
+
 	// Fill command arguments:
 	ENV.addUsage("-nimby", "Set initial state to 'nimby'.");
 	ENV.addUsage("-NIMBY", "Set initial state to 'NIMBY'.");

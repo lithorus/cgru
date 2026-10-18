@@ -134,6 +134,9 @@ public:
 
 	static inline const char * getTimeFormat()         { return timeformat.c_str();       } ///< Get default time format.
 
+	inline static const std::string & getLokiURL()       { return loki_url;                     }
+	static bool checkLokiConnection(std::string * out_version = nullptr, std::string * out_error = nullptr);
+
 	static inline int            getServerPort()   { return serverport;      } ///< Get afanasy server port.
 
 	static inline int getPriority() { return priority; } ///< Get default host priority.
@@ -313,6 +316,8 @@ private:
 /** Try to get \c AF_SERVER_PORT environment variable at first.
 *** If there is no \c AF_SERVER_PORT variable from \c definitions.h used.**/
 	static int serverport;
+
+	static std::string loki_url;
 
 	static bool perm_user_mod_his_priority;
 	static bool perm_user_mod_job_priority;

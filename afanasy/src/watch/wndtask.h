@@ -9,6 +9,9 @@
 
 #include <QPushButton>
 #include <QTabWidget>
+#include <QtWidgets/QWidget>
+#include <QtNetwork/QNetworkAccessManager>
+#include <QtNetwork/QNetworkReply>
 
 class QCloseEvent;
 class QContextMenuEvent;
@@ -66,6 +69,8 @@ private:
 
 	void getTaskInfo( const std::string & i_mode, int i_number = -1) const;
 
+	void queryLokiDirect(const QString &loki_url, int job_id, const QString &job_name, int block_num, int task_num, int session_num);
+
 	void taskOperation( const std::string & i_type) const;
 
 	void listen( bool i_subscribe);
@@ -82,6 +87,7 @@ private slots:
 	void slot_restart();
 	void slot_outputChanged( int i_index);
 	void slot_refresh();
+	void slot_lokiReplyFinished(QNetworkReply *reply);
 
 private:
 	ListTasks * m_parent;
@@ -115,6 +121,8 @@ private:
 	QWidget * m_tab_current;
 
 	bool m_listening;
+
+	QNetworkAccessManager * m_network_mgr;
 
 private:
 	static std::vector<WndTask*> ms_wndtasks;

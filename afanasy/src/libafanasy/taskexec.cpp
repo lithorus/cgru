@@ -96,6 +96,8 @@ void TaskExec::jsonWrite( std::ostringstream & o_str, int i_type) const
 		o_str << ",\"block_name\":\"" << m_block_name << "\"";
 	if( m_job_name.size())
 		o_str << ",\"job_name\":\""   << m_job_name   << "\"";
+	if( m_loki_url.size())
+		o_str << ",\"loki_url\":\""   << af::strEscape(m_loki_url) << "\"";
 
 	o_str << ",\"job_id\":"    << m_job_id;
 	o_str << ",\"block_num\":" << m_block_num;
@@ -173,6 +175,7 @@ void TaskExec::v_readwrite( Msg * msg)
 		rw_String  ( m_job_name,          msg);
 		rw_int32_t ( m_number,            msg);
 		rw_int32_t ( m_capacity,          msg);
+		rw_String  ( m_loki_url,          msg);
 		rw_int32_t ( m_capacity_coeff,    msg);
 		rw_int64_t ( m_time_start,        msg);
 		
@@ -255,6 +258,7 @@ int TaskExec::calcWeight() const
 	weight += weigh(m_block_name);
 	weight += weigh(m_job_name);
 	weight += weigh(m_user_name);
+	weight += weigh(m_loki_url);
 	weight += weigh(m_working_directory);
 	weight += weigh(m_environment);
 	weight += weigh(m_command_block);

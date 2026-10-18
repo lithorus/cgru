@@ -179,6 +179,9 @@
 	"af_db_stringnamelen":512,
 	"af_db_stringexprlen":4096,
 
+"":"Loki log writer:",
+	"af_loki_url":"",
+
 "":"System job:",
 	"af_sysjob_tasklife":1800,
 	"af_sysjob_tasksmax":1000,

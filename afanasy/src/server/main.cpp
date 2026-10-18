@@ -126,6 +126,23 @@ int main(int argc, char *argv[])
 	if( pthread_sigmask( SIG_BLOCK, &sigmask, NULL) != 0) perror("pthread_sigmask:");
 #endif
 
+	if (!af::Environment::getLokiURL().empty())
+	{
+		std::string version;
+		std::string err;
+		if (af::Environment::checkLokiConnection(&version, &err))
+		{
+			if (version != "unknown")
+				AF_LOG << "Loki connection SUCCESS: " << af::Environment::getLokiURL() << " (version: " << version << ")";
+			else
+				AF_LOG << "Loki connection SUCCESS: " << af::Environment::getLokiURL();
+		}
+		else
+		{
+			AF_WARN << "Loki connection FAILED: " << err;
+		}
+	}
+
 	// Containers initialization
 	BranchesContainer branches;
 	if( false == branches.isInitialized()) return 1;

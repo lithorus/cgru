@@ -17,11 +17,20 @@
 
 #ifdef WINNT
 #include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #else
 #include <pwd.h>
 #include <sys/resource.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 #endif
+
+#include <cerrno>
+#include <cstring>
 
 #include "../include/afanasy.h"
 #include "../include/afjob.h"
@@ -60,6 +69,8 @@ int     Environment::task_log_linesmax =               AFJOB::TASK_LOG_LINESMAX;
 int     Environment::task_progress_change_timeout =    AFJOB::TASK_PROGRESS_CHANGE_TIMEOUT;
 int     Environment::task_reconnect_timeout =          AFJOB::TASK_RECONNECT_TIMEOUT;
 
+std::string Environment::loki_url =                    "";
+
 int     Environment::serverport =                      AFADDR::SERVER_PORT;
 
 int     Environment::monitor_zombietime =              AFMONITOR::ZOMBIETIME;
@@ -82,7 +93,7 @@ std::vector<std::string> Environment::render_windowsmustdie;
 std::string Environment::open_folder_cmd =             AFGENERAL::OPEN_FOLDER_CMD;
 
 std::string Environment::cmd_shell =                   AFRENDER::CMD_SHELL;
- 
+
 std::string Environment::render_cmd_reboot =           AFRENDER::CMD_REBOOT;
 std::string Environment::render_cmd_shutdown =         AFRENDER::CMD_SHUTDOWN;
 std::string Environment::render_cmd_wolsleep =         AFRENDER::CMD_WOLSLEEP;
@@ -216,6 +227,182 @@ std::string Environment::version_python;
 std::string Environment::version_gcc;
 std::string Environment::build_date;
 
+bool Environment::checkLokiConnection(std::string * out_version, std::string * out_error)
+{
+	if (loki_url.empty())
+		return true;
+
+	std::string temp = loki_url;
+	if (temp.find("http://") == 0) temp = temp.substr(7);
+	else if (temp.find("https://") == 0) temp = temp.substr(8);
+
+	size_t slash = temp.find('/');
+	if (slash != std::string::npos)
+		temp = temp.substr(0, slash);
+
+	std::string host = "127.0.0.1";
+	std::string port_str = "3100";
+
+	size_t colon = temp.find(':');
+	if (colon != std::string::npos)
+	{
+		host = temp.substr(0, colon);
+		port_str = temp.substr(colon + 1);
+	}
+	else if (!temp.empty())
+	{
+		host = temp;
+	}
+
+	struct addrinfo hints;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+
+	struct addrinfo *res_list = nullptr;
+	int ret = getaddrinfo(host.c_str(), port_str.c_str(), &hints, &res_list);
+	if (ret != 0 || res_list == nullptr)
+	{
+		std::string err = "Failed to resolve Loki address (" + host + ":" + port_str + "): " + gai_strerror(ret);
+		if (out_error) *out_error = err;
+		return false;
+	}
+
+	int sock = -1;
+	bool connected = false;
+
+	for (struct addrinfo *rp = res_list; rp != nullptr; rp = rp->ai_next)
+	{
+		sock = ::socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		if (sock < 0)
+			continue;
+
+#ifdef WINNT
+		u_long mode = 1;
+		ioctlsocket(sock, FIONBIO, &mode);
+#else
+		int flags = fcntl(sock, F_GETFL, 0);
+		fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+#endif
+
+		int conn_res = ::connect(sock, rp->ai_addr, (socklen_t)rp->ai_addrlen);
+		if (conn_res < 0)
+		{
+#ifdef WINNT
+			int err_code = WSAGetLastError();
+			if (err_code != WSAEWOULDBLOCK)
+			{
+				closesocket(sock);
+				sock = -1;
+				continue;
+			}
+#else
+			if (errno != EINPROGRESS)
+			{
+				close(sock);
+				sock = -1;
+				continue;
+			}
+#endif
+			fd_set write_fds;
+			FD_ZERO(&write_fds);
+			FD_SET(sock, &write_fds);
+
+			struct timeval tv;
+			tv.tv_sec = 2;
+			tv.tv_usec = 0;
+
+			int sel_res = select(sock + 1, nullptr, &write_fds, nullptr, &tv);
+			if (sel_res <= 0)
+			{
+#ifdef WINNT
+				closesocket(sock);
+#else
+				close(sock);
+#endif
+				sock = -1;
+				continue;
+			}
+
+			int so_error = 0;
+			socklen_t len = sizeof(so_error);
+			getsockopt(sock, SOL_SOCKET, SO_ERROR, (char*)&so_error, &len);
+			if (so_error != 0)
+			{
+#ifdef WINNT
+				closesocket(sock);
+#else
+				close(sock);
+#endif
+				sock = -1;
+				continue;
+			}
+		}
+
+		connected = true;
+		break;
+	}
+
+	freeaddrinfo(res_list);
+
+	if (!connected || sock < 0)
+	{
+		std::string err = "Failed to connect to Loki server (" + host + ":" + port_str + ")";
+		if (out_error) *out_error = err;
+		return false;
+	}
+
+	// Request build info to verify connection and obtain Loki version
+	std::string req = "GET /loki/api/v1/status/buildinfo HTTP/1.1\r\nHost: " + host + "\r\nConnection: close\r\n\r\n";
+	send(sock, req.c_str(), (int)req.size(), 0);
+
+	// Read response with a short timeout
+	fd_set read_fds;
+	FD_ZERO(&read_fds);
+	FD_SET(sock, &read_fds);
+
+	struct timeval tv_read;
+	tv_read.tv_sec = 2;
+	tv_read.tv_usec = 0;
+
+	std::string response;
+	if (select(sock + 1, &read_fds, nullptr, nullptr, &tv_read) > 0)
+	{
+		char buf[1024];
+		int n = recv(sock, buf, sizeof(buf) - 1, 0);
+		if (n > 0)
+		{
+			buf[n] = '\0';
+			response = buf;
+		}
+	}
+
+#ifdef WINNT
+	closesocket(sock);
+#else
+	close(sock);
+#endif
+
+	// Extract "version":"..." if present in body
+	if (out_version)
+	{
+		*out_version = "unknown";
+		size_t v_pos = response.find("\"version\":");
+		if (v_pos != std::string::npos)
+		{
+			size_t q1 = response.find('"', v_pos + 10);
+			if (q1 != std::string::npos)
+			{
+				size_t q2 = response.find('"', q1 + 1);
+				if (q2 != std::string::npos)
+					*out_version = response.substr(q1 + 1, q2 - q1 - 1);
+			}
+		}
+	}
+
+	return true;
+}
+
 void Environment::getVars( const JSON * i_obj)
 {
 	if( i_obj && ( false == i_obj->IsObject()))
@@ -230,6 +417,7 @@ void Environment::getVars( const JSON * i_obj)
 	getVar( i_obj, digest_file,                       "af_digest_file"                       );
 	getVar( i_obj, digest_realm,                      "realm"                                );
 	getVar( i_obj, serverport,                        "af_serverport"                        );
+	getVar( i_obj, loki_url,                          "af_loki_url"                          );
 
 	getVar(i_obj, http_serve_dir,                     "af_http_serve_dir"                    );
 	getVar(i_obj, http_site_index,                    "af_http_site_index"                   );
@@ -949,7 +1137,7 @@ bool Environment::initAfterLoad()
 	store_folder_pools   = store_folder + AFGENERAL::PATH_SEPARATOR +   AFPOOL::STORE_FOLDER;
 
 	// HTTP serve folder:
-	if( http_serve_dir.empty()) 
+	if( http_serve_dir.empty())
 		http_serve_dir = cgrulocation;
 
 	// Server Accept IP Addresses Mask:
