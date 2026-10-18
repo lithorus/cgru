@@ -3,13 +3,14 @@
 #include "../include/afjob.h"
 
 #include "../libafanasy/name_af.h"
+#include "logwriter.h"
 
 class ParserHost
 {
 
 public:
 
-	ParserHost( af::Service * i_service);
+	ParserHost( af::Service * i_service, LogWriter * i_log_writer = nullptr);
 	~ParserHost();
 
 	void read(const std::string & i_mode, int i_pid, std::string & io_output, const std::string & i_resources);
@@ -26,10 +27,13 @@ public:
 	inline std::string getActivity()  const { return m_activity;        }
 	inline std::string getResources() const { return m_resources;       }
 	inline std::string getReport()    const { return m_report;          }
-	inline char* getData( int *size ) const { *size = m_datasize; return m_data;}
+	inline char* getData( int *size ) const { return m_log_writer ? m_log_writer->getData(size) : nullptr; }
+	inline LogWriter* getLogWriter() const { return m_log_writer; }
 
 private:
 	af::Service * m_service;
+	LogWriter   * m_log_writer;
+	bool          m_own_log_writer;
 
 	int  m_percent;
 	int  m_frame;
